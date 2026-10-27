@@ -13,6 +13,9 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Extract a pure evaluation-decision policy into the API scaffold.
 - [x] Add tests for target failures, critical regressions, missing observations, empty suites, invalid setup, and not-applicable experiments.
 - [x] Add API health and decision endpoint tests.
+- [x] Define scenario/assertion models and evaluate text, latency, and tool-call evidence.
+- [x] Add a provider-neutral adapter contract and explicit simulated fixture adapter.
+- [x] Add tests for scenario pass/fail/inconclusive outcomes and adapter errors.
 - [x] Add CI for backend tests and lint.
 - [ ] Expand tests for malformed inputs, partial runs, retries, nondeterminism, and all state transitions.
 
@@ -23,9 +26,10 @@ Milestones are complete only when code and reproducible evidence support them.
 - [ ] Add authentication/project authorization before storing private data.
 
 ## Phase 3 — Agent adapter and scenarios
-- [ ] Define provider-neutral async adapter contract.
-- [ ] Implement fake adapter for normal CI.
-- [ ] Build a minimal scenario runner with explicit preconditions and assertions.
+- [x] Define provider-neutral async adapter contract.
+- [x] Implement fake adapter for normal CI with simulated evidence mode.
+- [x] Build a minimal scenario runner with explicit assertions.
+- [ ] Extend scenarios with voice-specific event scripts (barge-in, silence, endpointing) once a runtime is selected.
 - [ ] Choose the first real voice-agent runtime from the existing agent stack.
 - [ ] Add bounded, opt-in live tests with strict spend/time limits.
 
