@@ -97,7 +97,8 @@
         <p class="subcopy">This calls your configured agent endpoint, not the fixture simulator. Set <code>PIXI_AGENT_ENDPOINT</code> on the backend and follow <a href="https://github.com/devxMani/Pixi/blob/main/docs/AGENT_BRIDGE.md" target="_blank" rel="noreferrer">the bridge contract</a>. Provider setup is server-side; credentials are never entered here.</p>
         <button class="btn full" id="live-run-button" type="button" disabled>↗ Run baseline scenario</button>
         <button class="btn secondary full" id="candidate-live-run-button" type="button" disabled>↗ Run selected candidate variant</button>
-        <p class="hint">Candidate variants must be executed by your bridge in an isolated staging environment. Pixi never applies a change to production.</p>
+        <button class="btn full" id="candidate-suite-button" type="button" disabled>▶ Run candidate across all project scenarios</button>
+        <p class="hint">Run a failing baseline on the target first. This executes the selected candidate against every saved scenario and saves each run. It never applies a change to production.</p>
       </section>
     </div>
   </div>
@@ -138,7 +139,7 @@
         <form id="candidate-run-eval-form">
           <fieldset id="candidate-run-eval-fields" disabled style="border:0;padding:0;margin:0;min-width:0">
             <h3>Evaluate from saved live runs</h3>
-            <p class="subcopy">Select a failed baseline target, a passing candidate target, and at least one candidate-variant regression run. Candidate runs must share the same immutable agent version.</p>
+            <p class="subcopy">Select a failed baseline target, a passing candidate target, and candidate regression runs for every other saved scenario. All candidate runs must share the same immutable agent version.</p>
             <div class="field"><label for="candidate-baseline-run">Baseline target run</label><select id="candidate-baseline-run" required><option value="">No live baseline run available</option></select></div>
             <div class="field"><label for="candidate-target-run">Candidate target run</label><select id="candidate-target-run" required><option value="">No candidate target run available</option></select></div>
             <div class="field"><label for="candidate-regression-runs">Candidate regression runs (every non-target scenario is required)</label><select id="candidate-regression-runs" multiple size="5" required><option value="">No candidate regression runs available</option></select><span id="candidate-regression-help" class="hint">Select a candidate to see required regression coverage.</span></div>
@@ -159,6 +160,7 @@
 const $ = (id) => document.getElementById(id);
 const state = { projects: [], scenarios: [], runs: [], candidates: [], projectId: "", scenarioId: "", runId: "", candidateId: "" };
 let pendingLiveRunAttempt = null;
+let pendingCandidateSuiteAttempt = null;
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -227,6 +229,7 @@ function renderScenarios() {
     $("run-fields").disabled = true;
     $("live-run-button").disabled = true;
     $("candidate-live-run-button").disabled = true;
+    $("candidate-suite-button").disabled = true;
     return;
   }
   if (!state.scenarios.length) {
@@ -248,6 +251,7 @@ function renderScenarios() {
   $("run-fields").disabled = !state.scenarioId;
   $("live-run-button").disabled = !state.scenarioId;
   $("candidate-live-run-button").disabled = !state.scenarioId || !state.candidateId;
+  $("candidate-suite-button").disabled = !state.projectId || !state.scenarios.length || !state.candidateId;
 }
 function renderSelectedScenario() {
   const box = $("selected-scenario");
@@ -259,6 +263,7 @@ function renderSelectedScenario() {
     $("run-fields").disabled = true;
     $("live-run-button").disabled = true;
     $("candidate-live-run-button").disabled = true;
+    $("candidate-suite-button").disabled = !state.projectId || !state.scenarios.length || !state.candidateId;
     return;
   }
   const def = selected.definition || {};
@@ -581,8 +586,86 @@ async function runConfiguredAgent(candidateId) {
     button.textContent = defaultText;
   }
 }
+async function runCandidateSuite(candidateId) {
+  clearNotice();
+  const candidate = state.candidates.find((item) => item.id === candidateId);
+  if (!state.projectId || !state.scenarios.length || !candidate) {
+    notice("Create a project with saved scenarios and select a candidate first.", true);
+    return;
+  }
+  const projectId = state.projectId;
+  const scenarios = [...state.scenarios];
+  const scope = projectId + ":" + candidateId;
+  if (!pendingCandidateSuiteAttempt || pendingCandidateSuiteAttempt.scope !== scope) {
+    pendingCandidateSuiteAttempt = {scope, keys:{}};
+  }
+  for (const scenario of scenarios) {
+    if (!pendingCandidateSuiteAttempt.keys[scenario.id]) {
+      pendingCandidateSuiteAttempt.keys[scenario.id] =
+        (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function")
+          ? globalThis.crypto.randomUUID()
+          : (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + "-" + scenario.id);
+    }
+  }
+
+  const button = $("candidate-suite-button");
+  const defaultText = "▶ Run candidate across all project scenarios";
+  button.disabled = true;
+  $("live-run-button").disabled = true;
+  $("candidate-live-run-button").disabled = true;
+  $("project-select").disabled = true;
+  const results = [];
+  let currentScenarioName = "Starting";
+  try {
+    for (let index = 0; index < scenarios.length; index += 1) {
+      const scenario = scenarios[index];
+      currentScenarioName = scenario.name;
+      button.textContent = "Running candidate suite (" + (index + 1) + "/" + scenarios.length + "): " + scenario.name;
+      const run = await api(
+        "/api/v1/projects/" + encodeURIComponent(projectId) +
+        "/scenarios/" + encodeURIComponent(scenario.id) + "/agent-runs?candidate_id=" +
+        encodeURIComponent(candidateId),
+        {
+          method:"POST",
+          headers:{"Idempotency-Key":pendingCandidateSuiteAttempt.keys[scenario.id]}
+        }
+      );
+      results.push(run);
+    }
+
+    // Retain the attempt keys until the saved history refresh succeeds. If the refresh
+    // fails, a retry repeats requests with the same keys instead of making duplicate calls.
+    await loadProjectData(results.length ? results[results.length - 1].id : undefined, candidateId);
+    pendingCandidateSuiteAttempt = null;
+    const passed = results.filter((run) => run.status === "passed").length;
+    const failed = results.filter((run) => run.status === "failed").length;
+    const inconclusive = results.filter((run) => run.status === "inconclusive").length;
+    const versions = Array.from(new Set(results.map((run) => run.agent_version).filter(Boolean)));
+    const versionLabel = versions.length === 1 ? versions[0] : versions.length === 0 ? "missing" : "inconsistent";
+    const isClean = failed === 0 && inconclusive === 0 && versions.length === 1;
+    notice(
+      "Candidate suite saved " + results.length + " run(s): " + passed + " passed, " +
+      failed + " failed, " + inconclusive + " inconclusive. Candidate version(s): " +
+      versionLabel + ". Next, evaluate against the failed baseline and inspect the complete saved evidence.",
+      !isClean
+    );
+  } catch (error) {
+    notice(
+      "Candidate suite stopped at \"" + currentScenarioName + "\". Completed runs remain saved. " +
+      "Retry safely reuses the same idempotency keys. " + (error.message || "Request failed."),
+      true
+    );
+  } finally {
+    button.textContent = defaultText;
+    $("project-select").disabled = false;
+    $("live-run-button").disabled = !state.scenarioId;
+    $("candidate-live-run-button").disabled = !state.scenarioId || !state.candidateId;
+    button.disabled = !state.projectId || !state.scenarios.length || !state.candidateId;
+  }
+}
 $("live-run-button").addEventListener("click", () => runConfiguredAgent(null));
 $("candidate-live-run-button").addEventListener("click", () => runConfiguredAgent(state.candidateId));
+$("candidate-suite-button").addEventListener("click", () => runCandidateSuite(state.candidateId));
 
 function renderCandidates() {
   const list = $("candidate-list");
