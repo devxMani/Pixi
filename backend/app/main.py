@@ -35,6 +35,7 @@ from app.schemas import (
     CandidateCreate,
     CandidateEvaluationInput,
     CandidateReviewInput,
+    CandidateRunEvaluationInput,
     EvaluateInput,
     FixtureObservationInput,
     ProjectCreate,
@@ -123,6 +124,9 @@ def _serialize_run(db: Session, run: RunRecord) -> dict[str, object]:
         "scenario_id": run.scenario_id,
         "adapter_name": run.adapter_name,
         "evidence_mode": run.evidence_mode,
+        "variant": run.variant,
+        "candidate_id": run.candidate_id,
+        "agent_version": run.agent_version,
         "status": run.status,
         "scenario_snapshot": run.scenario_snapshot,
         "started_at": run.started_at,
@@ -177,6 +181,9 @@ def _persist_scenario_result(
         scenario_snapshot=scenario.model_dump(mode="json"),
         idempotency_key=idempotency_key,
         idempotency_fingerprint=fingerprint,
+        candidate_id=result.observation.candidate_id,
+        variant=result.observation.variant.value,
+        agent_version=result.observation.agent_version,
         started_at=started_at,
         finished_at=finished_at,
     )
@@ -430,6 +437,7 @@ async def create_agent_run(
     scenario_id: str,
     db: Annotated[Session, Depends(get_db)],
     response: Response,
+    candidate_id: Annotated[str | None, Query(min_length=1, max_length=36)] = None,
     idempotency_key: Annotated[
         str | None, Header(alias="Idempotency-Key", min_length=1, max_length=200)
     ] = None,
@@ -439,8 +447,19 @@ async def create_agent_run(
     scenario_record = db.get(ScenarioRecord, scenario_id)
     if scenario_record is None or scenario_record.project_id != project_id:
         raise HTTPException(status_code=404, detail="Scenario not found in this project.")
+    candidate_record: CandidateRecord | None = None
+    candidate_context: dict[str, str] | None = None
+    if candidate_id is not None:
+        candidate_record = db.get(CandidateRecord, candidate_id)
+        if candidate_record is None or candidate_record.project_id != project_id:
+            raise HTTPException(status_code=404, detail="Candidate not found in this project.")
+        candidate_context = {
+            "id": candidate_record.id,
+            "hypothesis": candidate_record.hypothesis,
+            "proposed_change": candidate_record.proposed_change,
+        }
     try:
-        adapter = build_configured_http_adapter()
+        adapter = build_configured_http_adapter(candidate=candidate_context)
     except ValueError as exc:
         raise HTTPException(
             status_code=503,
@@ -458,6 +477,7 @@ async def create_agent_run(
                 "scenario_id": scenario_id,
                 "scenario": scenario.model_dump(mode="json"),
                 "endpoint": adapter.endpoint,
+                "candidate_id": candidate_id,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -591,6 +611,202 @@ def evaluate_candidate(
             failed_regressions=list(decision.failed_regressions),
             critical_regressions=list(decision.critical_regressions),
             checks_snapshot=checks,
+        )
+    )
+    if decision.outcome.value == "passed":
+        candidate.status = "validated_for_review"
+    elif decision.outcome.value == "failed":
+        candidate.status = "gate_failed"
+    else:
+        candidate.status = decision.outcome.value
+    db.commit()
+    db.refresh(candidate)
+    return _serialize_candidate(db, candidate)
+
+
+def _checks_from_saved_run(
+    db: Session, run: RunRecord, *, include_scenario_name: bool = False
+) -> list[CheckResult]:
+    """Rebuild immutable check results from a persisted run and its scenario snapshot."""
+    assertions = run.scenario_snapshot.get("assertions", [])
+    assertion_meta = {
+        item.get("id"): item for item in assertions if isinstance(item, dict)
+    }
+    scenario_name = str(run.scenario_snapshot.get("name") or run.scenario_id)
+    saved_checks = db.scalars(
+        select(CheckRecord)
+        .where(CheckRecord.run_id == run.id)
+        .order_by(CheckRecord.sequence)
+    ).all()
+    output: list[CheckResult] = []
+    for check in saved_checks:
+        assertion = assertion_meta.get(check.assertion_id, {})
+        name = (
+            f"{scenario_name}::{check.assertion_id}"
+            if include_scenario_name
+            else check.assertion_id
+        )
+        output.append(
+            CheckResult(
+                name=name,
+                passed=check.passed,
+                critical=bool(assertion.get("critical", False)),
+                error=check.error,
+            )
+        )
+    return output
+
+
+@router.post("/candidates/{candidate_id}/evaluate-runs", status_code=201)
+def evaluate_candidate_from_runs(
+    candidate_id: str,
+    payload: CandidateRunEvaluationInput,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    """Gate a candidate using persisted baseline, candidate-target, and regression run evidence."""
+    candidate = db.get(CandidateRecord, candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+
+    regression_ids = payload.regression_run_ids
+    if payload.baseline_run_id == payload.candidate_target_run_id:
+        raise HTTPException(status_code=422, detail="Baseline and candidate target runs must differ.")
+    if payload.baseline_run_id in regression_ids or payload.candidate_target_run_id in regression_ids:
+        raise HTTPException(status_code=422, detail="Run IDs must be unique across evaluation roles.")
+
+    baseline_run = db.get(RunRecord, payload.baseline_run_id)
+    target_run = db.get(RunRecord, payload.candidate_target_run_id)
+    regression_runs = [db.get(RunRecord, run_id) for run_id in regression_ids]
+    if baseline_run is None or target_run is None or any(run is None for run in regression_runs):
+        raise HTTPException(status_code=404, detail="One or more referenced runs were not found.")
+
+    all_runs = [baseline_run, target_run, *regression_runs]
+    if any(run.project_id != candidate.project_id for run in all_runs):
+        raise HTTPException(status_code=404, detail="One or more runs are outside this project.")
+    if baseline_run.scenario_id != candidate.scenario_id or target_run.scenario_id != candidate.scenario_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Baseline and candidate target runs must use the candidate's target scenario.",
+        )
+    if baseline_run.evidence_mode != "live" or baseline_run.variant != "baseline" or baseline_run.candidate_id:
+        raise HTTPException(
+            status_code=409,
+            detail="The baseline run must be a recorded live baseline variant.",
+        )
+    if target_run.evidence_mode != "live" or target_run.variant != "candidate" or target_run.candidate_id != candidate.id:
+        raise HTTPException(
+            status_code=409,
+            detail="The candidate target run must be live evidence for this candidate variant.",
+        )
+    if any(
+        run.evidence_mode != "live"
+        or run.variant != "candidate"
+        or run.candidate_id != candidate.id
+        for run in regression_runs
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Every regression run must be live evidence for this same candidate variant.",
+        )
+    regression_scenarios = [run.scenario_id for run in regression_runs]
+    if candidate.scenario_id in regression_scenarios:
+        raise HTTPException(
+            status_code=422,
+            detail="Regression runs must cover scenarios other than the target scenario.",
+        )
+    if len(regression_scenarios) != len(set(regression_scenarios)):
+        raise HTTPException(
+            status_code=422,
+            detail="Use one regression run per distinct scenario.",
+        )
+
+    baseline_version = baseline_run.agent_version
+    candidate_versions = [target_run.agent_version, *(run.agent_version for run in regression_runs)]
+    has_missing_versions = not baseline_version or any(not version for version in candidate_versions)
+    versions_disagree = (
+        not has_missing_versions
+        and (len(set(candidate_versions)) != 1 or baseline_version == candidate_versions[0])
+    )
+
+    target_checks = _checks_from_saved_run(db, target_run)
+    regression_checks = [
+        check
+        for run in regression_runs
+        for check in _checks_from_saved_run(db, run, include_scenario_name=True)
+    ]
+    applicable = baseline_run.status != "passed"
+    setup_valid = not versions_disagree
+    if baseline_run.status == "inconclusive":
+        target_checks = [
+            CheckResult(
+                name="baseline-run",
+                passed=None,
+                error="Baseline run was inconclusive; target failure precondition is unknown.",
+            ),
+            *target_checks,
+        ]
+    if has_missing_versions:
+        target_checks = [
+            *target_checks,
+            CheckResult(
+                name="agent-version",
+                passed=None,
+                error="A required run did not return an immutable agent version.",
+            ),
+        ]
+    decision = decide_evaluation(
+        setup_valid=setup_valid,
+        applicable=applicable,
+        target_checks=target_checks,
+        regression_checks=regression_checks,
+    )
+    checks_snapshot = {
+        "source": "persisted_run_evidence",
+        "baseline": {
+            "run_id": baseline_run.id,
+            "status": baseline_run.status,
+            "agent_version": baseline_run.agent_version,
+            "checks": [
+                {"name": check.name, "passed": check.passed, "critical": check.critical, "error": check.error}
+                for check in _checks_from_saved_run(db, baseline_run)
+            ],
+        },
+        "candidate_target": {
+            "run_id": target_run.id,
+            "candidate_id": target_run.candidate_id,
+            "agent_version": target_run.agent_version,
+            "checks": [
+                {"name": check.name, "passed": check.passed, "critical": check.critical, "error": check.error}
+                for check in target_checks
+            ],
+        },
+        "regressions": [
+            {
+                "run_id": run.id,
+                "scenario_id": run.scenario_id,
+                "agent_version": run.agent_version,
+                "checks": [
+                    {"name": check.name, "passed": check.passed, "critical": check.critical, "error": check.error}
+                    for check in _checks_from_saved_run(db, run, include_scenario_name=True)
+                ],
+            }
+            for run in regression_runs
+        ],
+        "setup_valid": setup_valid,
+        "applicable": applicable,
+    }
+    db.add(
+        CandidateEvaluationRecord(
+            id=str(uuid4()),
+            candidate_id=candidate.id,
+            outcome=decision.outcome.value,
+            reason=decision.reason,
+            evidence_mode="live",
+            target_passed=decision.target_passed,
+            regression_count=decision.regression_count,
+            failed_regressions=list(decision.failed_regressions),
+            critical_regressions=list(decision.critical_regressions),
+            checks_snapshot=checks_snapshot,
         )
     )
     if decision.outcome.value == "passed":

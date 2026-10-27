@@ -14,6 +14,12 @@ class EvidenceMode(StrEnum):
     LIVE = "live"
 
 
+class RunVariant(StrEnum):
+    SIMULATED = "simulated"
+    BASELINE = "baseline"
+    CANDIDATE = "candidate"
+
+
 class AssertionKind(StrEnum):
     CONTAINS = "contains"
     NOT_CONTAINS = "not_contains"
@@ -28,6 +34,7 @@ class ScenarioAssertion(BaseModel):
     expected_text: str | None = None
     threshold_ms: float | None = Field(default=None, ge=0)
     tool_name: str | None = None
+    critical: bool = False
 
     @model_validator(mode="after")
     def validate_required_argument(self) -> ScenarioAssertion:
@@ -63,6 +70,9 @@ class AgentObservation(BaseModel):
     evidence_mode: EvidenceMode = EvidenceMode.SIMULATED
     provider: str | None = None
     model: str | None = None
+    agent_version: str | None = None
+    variant: RunVariant = RunVariant.SIMULATED
+    candidate_id: str | None = None
 
 
 class ScenarioStatus(StrEnum):

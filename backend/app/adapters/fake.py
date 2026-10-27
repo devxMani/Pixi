@@ -1,12 +1,14 @@
 """Deterministic fixture adapter for tests and demos; never reports live evidence."""
 from __future__ import annotations
 
-from app.domain.scenarios import AgentObservation, EvidenceMode, Scenario
+from app.domain.scenarios import AgentObservation, EvidenceMode, RunVariant, Scenario
 
 
 class FixtureAgentAdapter:
     name = "fixture"
     evidence_mode = EvidenceMode.SIMULATED
+    variant = RunVariant.SIMULATED
+    candidate_id: str | None = None
 
     def __init__(
         self,
