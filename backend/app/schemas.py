@@ -266,7 +266,7 @@ class ProjectImportInput(BaseModel):
                 baseline = snapshot.get("baseline")
                 target = snapshot.get("candidate_target")
                 if not isinstance(baseline, dict) or not isinstance(target, dict):
-                    raise ValueError("An evidence evaluation must include baseline and candidate target details.")
+                    raise ValueError("An evidence evaluation must include baseline and candidate target details.")  # noqa: TRY004 - Pydantic requires ValueError for a validation response
                 baseline_id = baseline.get("run_id")
                 target_id = target.get("run_id")
                 if (
@@ -294,10 +294,10 @@ class ProjectImportInput(BaseModel):
                     raise ValueError("Evaluation target snapshot references a different candidate.")
                 regressions = snapshot.get("regressions")
                 if not isinstance(regressions, list) or not regressions:
-                    raise ValueError("An evidence evaluation must include at least one regression run.")
+                    raise ValueError("An evidence evaluation must include at least one regression run.")  # noqa: TRY004 - Pydantic requires ValueError for a validation response
                 for regression in regressions:
                     if not isinstance(regression, dict):
-                        raise ValueError("Regression evidence entries must be objects.")
+                        raise ValueError("Regression evidence entries must be objects.")  # noqa: TRY004 - Pydantic requires ValueError for a validation response
                     regression_id = regression.get("run_id")
                     if not isinstance(regression_id, str) or regression_id not in run_id_set:
                         raise ValueError("A regression snapshot references a run absent from the backup.")
