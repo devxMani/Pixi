@@ -1,6 +1,6 @@
 # Pixi API
 
-The API includes the tested evaluation policy, scenario/assertion contracts, provider-neutral adapter protocol, SQLAlchemy persistence, and a simple browser workspace.
+The API includes the tested evaluation policy, scenario/assertion contracts, provider-neutral adapter protocol, SQLAlchemy persistence, and a browser workspace with a persisted candidate review flow. Candidate-gate runs are stamped simulated, and release approval is rejected without passing live-agent evidence.
 
 ## Run locally
 

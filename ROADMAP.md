@@ -27,7 +27,8 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Add API tests for saved history, errors, project scoping and the development-only guard.
 - [x] Serve the original prototype and the API-backed workspace through FastAPI.
 - [x] Add a run-history endpoint used by the workspace.
-- [ ] Add candidate/version/decision persistence, idempotency, export/restore and restart tests.
+- [x] Persist candidate proposals, evaluation snapshots, and human-review decisions; simulated evidence cannot be approved for release.
+- [ ] Add agent version records, idempotency, export/restore and restart tests.
 - [ ] Add authentication/project authorization before storing private data.
 
 ## Phase 3 — Agent adapter and scenarios
@@ -44,7 +45,8 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Create a local API-backed UI for projects, scenarios, fixture runs, checks, and saved history.
 - [ ] Connect real-agent run history to the workspace.
 - [ ] Make live-vs-simulated evidence provenance visually unambiguous in every view.
-- [ ] Implement candidate diffs and human-reviewed decisions.
+- [x] Implement candidate hypotheses/changes, gate evaluation snapshots, and human-review records; release approval remains locked for simulated evidence.
+- [ ] Connect candidate evaluation to real adapter runs and real agent-version diffs.
 - [ ] Demonstrate one reproducible accepted improvement and one reproducible rejected regression.
 
 ## Phase 5 — Product hardening

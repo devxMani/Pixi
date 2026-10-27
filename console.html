@@ -7,7 +7,7 @@
 <meta name="description" content="Build reproducible voice-agent scenarios and review evaluation evidence.">
 <style>
 :root{color-scheme:light;--ink:#17221e;--muted:#6c7972;--line:#dce5df;--paper:#f4f7f3;--card:#fff;--green:#19583f;--mint:#d8f0df;--orange:#f2a65a;--red:#a43636;--shadow:0 16px 45px rgba(30,60,44,.07)}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 600px at 80% -10%,#deeee1 0%,transparent 70%),var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.5}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}.top{height:76px;padding:0 34px;border-bottom:1px solid rgba(210,222,214,.9);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.66);backdrop-filter:blur(16px);position:sticky;top:0;z-index:10}.brand{display:flex;align-items:center;gap:11px;font-size:20px;font-weight:750;letter-spacing:-.05em}.logo{width:35px;height:35px;border-radius:11px;background:var(--green);color:white;display:grid;place-items:center;font-family:ui-monospace,monospace;font-size:20px}.brand small{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:700}.head-actions{display:flex;gap:10px;align-items:center}.toplink{padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:white;font-size:12px;font-weight:650}.env-pill,.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:750;letter-spacing:.03em;background:#fff1dc;color:#82501b;border:1px solid #f1d7ad;text-transform:uppercase}.dot{width:7px;height:7px;border-radius:50%;background:currentColor}.layout{max-width:1440px;margin:auto;padding:28px 32px 60px}.intro{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:25px}.eyebrow{font-size:11px;color:var(--green);font-weight:800;letter-spacing:.15em;text-transform:uppercase}.intro h1{font-size:clamp(26px,3vw,39px);line-height:1.1;letter-spacing:-.055em;margin:8px 0 9px}.intro p{margin:0;color:var(--muted);max-width:650px}.sim-notice{max-width:310px;background:#fffaf1;border:1px solid #f1dfc3;padding:12px 15px;border-radius:13px;color:#795521;font-size:12px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:22px}.stat,.panel{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow)}.stat{padding:16px 18px}.stat small{display:block;color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}.stat strong{display:block;margin-top:7px;font-size:25px;letter-spacing:-.04em}.stat span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.workspace{display:grid;grid-template-columns:minmax(255px,.72fr) minmax(0,1.65fr);gap:18px;align-items:start}.panel{padding:20px;min-width:0}.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:17px}.panel h2{font-size:16px;letter-spacing:-.03em;margin:0}.panel h3{font-size:12px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.subcopy{color:var(--muted);font-size:12px;margin:5px 0 0}.field{margin:12px 0}.field label{display:block;color:#49574f;font-weight:700;font-size:12px;margin-bottom:6px}.field input,.field select,.field textarea,select{width:100%;border:1px solid #d5dfd8;border-radius:10px;background:#fff;padding:10px 11px;color:var(--ink);outline:none}.field input:focus,.field select:focus,.field textarea:focus,select:focus{border-color:#659c7b;box-shadow:0 0 0 3px rgba(70,139,94,.12)}textarea{resize:vertical;min-height:75px}.field .hint{display:block;color:var(--muted);font-size:11px;margin-top:5px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:white;font-size:12px;font-weight:750;box-shadow:0 4px 12px rgba(25,88,63,.12)}.btn:hover{background:#10452f}.btn.secondary{background:#edf4ee;color:var(--green);box-shadow:none;border:1px solid #d9e7dc}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.full{width:100%}.rule{height:1px;background:#e6ece7;margin:18px 0}.scenario-list,.run-list{display:flex;flex-direction:column;gap:8px}.scenario-item,.run-item{display:block;width:100%;text-align:left;padding:12px;border-radius:11px;border:1px solid transparent;background:#f7f9f7;color:var(--ink)}.scenario-item:hover,.run-item:hover{border-color:#c9dacd}.scenario-item.selected,.run-item.selected{background:#edf7ef;border-color:#8abb98}.scenario-item strong,.run-item strong{display:block;font-size:12px}.scenario-item span,.run-item span{display:block;color:var(--muted);font-size:11px;margin-top:4px}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.scenario-summary{background:#f6f9f6;border:1px solid #e0e9e1;border-radius:12px;padding:13px;margin:14px 0}.scenario-summary strong{display:block;font-size:13px}.scenario-summary p{font-size:12px;color:var(--muted);margin:5px 0 0;white-space:pre-wrap}.section-title{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:800;margin:0 0 5px}.number{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:8px;background:var(--mint);color:var(--green);font-size:11px}.right-stack{display:grid;gap:18px}.history{margin-top:18px}.history-grid{display:grid;grid-template-columns:minmax(270px,.8fr) minmax(0,1.3fr);gap:18px}.status{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.status.passed{background:#dff4e5;color:#166339}.status.failed{background:#fce4e4;color:#9c3131}.status.inconclusive{background:#fff0d8;color:#82521d}.status.simulated{background:#fff0d8;color:#82521d}.empty{padding:18px;border:1px dashed #cedbd1;border-radius:12px;color:var(--muted);font-size:12px;text-align:center}.notice{margin:0 0 17px;padding:12px 14px;border-radius:12px;border:1px solid #c5dccb;background:#eff8f0;color:#235d3d;font-size:12px;display:none}.notice.error{display:block;border-color:#e7c1c1;background:#fff1f1;color:#8b2828}.notice.show{display:block}.run-detail{background:#f8faf8;border:1px solid #e0e8e2;border-radius:12px;padding:15px;min-height:160px}.detail-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.detail-title{font-size:13px;font-weight:800}.detail-body{margin-top:13px}.detail-row{display:grid;grid-template-columns:105px minmax(0,1fr);gap:8px;border-top:1px solid #e3e9e4;padding:10px 0;font-size:12px}.detail-row strong{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}.detail-row p,.detail-row pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit}.checks{display:flex;flex-direction:column;gap:7px}.check{display:flex;justify-content:space-between;gap:10px;font-size:12px;background:#fff;border:1px solid #e6ece7;border-radius:9px;padding:8px 10px}.check small{color:var(--muted)}.footer{padding-top:20px;color:var(--muted);font-size:11px;text-align:center}.hidden{display:none!important}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 600px at 80% -10%,#deeee1 0%,transparent 70%),var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.5}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}.top{height:76px;padding:0 34px;border-bottom:1px solid rgba(210,222,214,.9);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.66);backdrop-filter:blur(16px);position:sticky;top:0;z-index:10}.brand{display:flex;align-items:center;gap:11px;font-size:20px;font-weight:750;letter-spacing:-.05em}.logo{width:35px;height:35px;border-radius:11px;background:var(--green);color:white;display:grid;place-items:center;font-family:ui-monospace,monospace;font-size:20px}.brand small{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:700}.head-actions{display:flex;gap:10px;align-items:center}.toplink{padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:white;font-size:12px;font-weight:650}.env-pill,.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:750;letter-spacing:.03em;background:#fff1dc;color:#82501b;border:1px solid #f1d7ad;text-transform:uppercase}.dot{width:7px;height:7px;border-radius:50%;background:currentColor}.layout{max-width:1440px;margin:auto;padding:28px 32px 60px}.intro{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:25px}.eyebrow{font-size:11px;color:var(--green);font-weight:800;letter-spacing:.15em;text-transform:uppercase}.intro h1{font-size:clamp(26px,3vw,39px);line-height:1.1;letter-spacing:-.055em;margin:8px 0 9px}.intro p{margin:0;color:var(--muted);max-width:650px}.sim-notice{max-width:310px;background:#fffaf1;border:1px solid #f1dfc3;padding:12px 15px;border-radius:13px;color:#795521;font-size:12px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:22px}.stat,.panel{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow)}.stat{padding:16px 18px}.stat small{display:block;color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}.stat strong{display:block;margin-top:7px;font-size:25px;letter-spacing:-.04em}.stat span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.workspace{display:grid;grid-template-columns:minmax(255px,.72fr) minmax(0,1.65fr);gap:18px;align-items:start}.panel{padding:20px;min-width:0}.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:17px}.panel h2{font-size:16px;letter-spacing:-.03em;margin:0}.panel h3{font-size:12px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.subcopy{color:var(--muted);font-size:12px;margin:5px 0 0}.field{margin:12px 0}.field label{display:block;color:#49574f;font-weight:700;font-size:12px;margin-bottom:6px}.field input,.field select,.field textarea,select{width:100%;border:1px solid #d5dfd8;border-radius:10px;background:#fff;padding:10px 11px;color:var(--ink);outline:none}.field input:focus,.field select:focus,.field textarea:focus,select:focus{border-color:#659c7b;box-shadow:0 0 0 3px rgba(70,139,94,.12)}textarea{resize:vertical;min-height:75px}.field .hint{display:block;color:var(--muted);font-size:11px;margin-top:5px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:white;font-size:12px;font-weight:750;box-shadow:0 4px 12px rgba(25,88,63,.12)}.btn:hover{background:#10452f}.btn.secondary{background:#edf4ee;color:var(--green);box-shadow:none;border:1px solid #d9e7dc}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.full{width:100%}.rule{height:1px;background:#e6ece7;margin:18px 0}.scenario-list,.run-list{display:flex;flex-direction:column;gap:8px}.scenario-item,.run-item{display:block;width:100%;text-align:left;padding:12px;border-radius:11px;border:1px solid transparent;background:#f7f9f7;color:var(--ink)}.scenario-item:hover,.run-item:hover{border-color:#c9dacd}.scenario-item.selected,.run-item.selected{background:#edf7ef;border-color:#8abb98}.scenario-item strong,.run-item strong{display:block;font-size:12px}.scenario-item span,.run-item span{display:block;color:var(--muted);font-size:11px;margin-top:4px}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.toggle{display:flex;align-items:center;gap:8px;margin:5px 0;padding:8px 10px;border:1px solid #e2eae3;border-radius:9px;background:#f6f9f6;font-size:12px}.toggle input{width:15px;height:15px;margin:0;accent-color:var(--green)}.scenario-summary{background:#f6f9f6;border:1px solid #e0e9e1;border-radius:12px;padding:13px;margin:14px 0}.scenario-summary strong{display:block;font-size:13px}.scenario-summary p{font-size:12px;color:var(--muted);margin:5px 0 0;white-space:pre-wrap}.section-title{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:800;margin:0 0 5px}.number{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:8px;background:var(--mint);color:var(--green);font-size:11px}.right-stack{display:grid;gap:18px}.history{margin-top:18px}.history-grid{display:grid;grid-template-columns:minmax(270px,.8fr) minmax(0,1.3fr);gap:18px}.status{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.status.passed{background:#dff4e5;color:#166339}.status.failed{background:#fce4e4;color:#9c3131}.status.inconclusive{background:#fff0d8;color:#82521d}.status.simulated{background:#fff0d8;color:#82521d}.empty{padding:18px;border:1px dashed #cedbd1;border-radius:12px;color:var(--muted);font-size:12px;text-align:center}.notice{margin:0 0 17px;padding:12px 14px;border-radius:12px;border:1px solid #c5dccb;background:#eff8f0;color:#235d3d;font-size:12px;display:none}.notice.error{display:block;border-color:#e7c1c1;background:#fff1f1;color:#8b2828}.notice.show{display:block}.run-detail{background:#f8faf8;border:1px solid #e0e8e2;border-radius:12px;padding:15px;min-height:160px}.detail-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.detail-title{font-size:13px;font-weight:800}.detail-body{margin-top:13px}.detail-row{display:grid;grid-template-columns:105px minmax(0,1fr);gap:8px;border-top:1px solid #e3e9e4;padding:10px 0;font-size:12px}.detail-row strong{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}.detail-row p,.detail-row pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit}.checks{display:flex;flex-direction:column;gap:7px}.check{display:flex;justify-content:space-between;gap:10px;font-size:12px;background:#fff;border:1px solid #e6ece7;border-radius:9px;padding:8px 10px}.check small{color:var(--muted)}.footer{padding-top:20px;color:var(--muted);font-size:11px;text-align:center}.hidden{display:none!important}
 @media(max-width:980px){.layout{padding:24px 18px 45px}.workspace{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.history-grid{grid-template-columns:1fr}.intro{align-items:flex-start;flex-direction:column}.sim-notice{max-width:none}}@media(max-width:560px){.top{height:auto;padding:14px 15px;align-items:flex-start;gap:10px}.head-actions{flex-wrap:wrap;justify-content:flex-end}.toplink{padding:7px 9px}.layout{padding:18px 12px 36px}.panel{padding:15px}.stats{gap:8px}.stat{padding:13px}.stat strong{font-size:22px}.two{grid-template-columns:1fr}}
 </style>
 </head>
@@ -89,11 +89,45 @@
       <div id="run-detail" class="run-detail"><div class="empty">Select a saved run to inspect its observation and assertions.</div></div>
     </div>
   </section>
+  <section id="candidate-section" class="panel history">
+    <div class="panel-head"><div><h2>Candidate change lab</h2><p class="subcopy">Record a hypothesis, test the decision gate, and save human review.</p></div><span class="pill">SIMULATED GATE</span></div>
+    <div class="history-grid">
+      <div>
+        <form id="candidate-form">
+          <div class="field"><label for="candidate-hypothesis">Hypothesis</label><input id="candidate-hypothesis" maxlength="2000" placeholder="A shorter confirmation should reduce caller wait time" required></div>
+          <div class="field"><label for="candidate-change">Proposed change</label><textarea id="candidate-change" maxlength="10000" placeholder="Describe the prompt/config change. Do not paste secrets." required></textarea></div>
+          <button class="btn" type="submit">＋ Record candidate</button>
+        </form>
+        <div class="rule"></div>
+        <h3>Candidate history</h3>
+        <div id="candidate-list" class="run-list"><div class="empty">Select a project and scenario to get started.</div></div>
+      </div>
+      <div>
+        <form id="candidate-eval-form">
+          <fieldset id="candidate-eval-fields" disabled style="border:0;padding:0;margin:0;min-width:0">
+            <div class="field"><label>Evaluation fixture controls</label>
+              <label class="toggle"><input id="candidate-target-pass" type="checkbox" checked> Target checks pass</label>
+              <label class="toggle"><input id="candidate-regression-pass" type="checkbox" checked> Baseline regressions pass</label>
+              <label class="toggle"><input id="candidate-critical-fail" type="checkbox"> A critical safety regression fails</label>
+              <label class="toggle"><input id="candidate-missing-evidence" type="checkbox"> Required regression evidence is missing</label>
+              <span class="hint">These controls test the policy with fixture values only; no model or external voice agent runs.</span>
+            </div>
+            <button class="btn full" type="submit">Evaluate candidate gate</button>
+          </fieldset>
+        </form>
+        <div id="candidate-detail" class="run-detail" style="margin-top:14px"><div class="empty">Select a candidate to inspect its saved evaluation.</div></div>
+        <div class="field"><label for="candidate-reviewer">Reviewer</label><input id="candidate-reviewer" maxlength="120" value="Local reviewer"></div>
+        <div class="field"><label for="candidate-review-note">Review note</label><textarea id="candidate-review-note" maxlength="2000" placeholder="Why accept or reject?"></textarea></div>
+        <div class="two"><button class="btn" id="candidate-accept" type="button" disabled title="A passing live-agent evaluation is required">Approve for release</button><button class="btn secondary" id="candidate-reject" type="button" disabled>Reject candidate</button></div>
+        <p class="hint">Release approval requires a passing evaluation with live evidence. Simulated candidates cannot be approved, and Pixi never applies changes to production automatically.</p>
+      </div>
+    </div>
+  </section>
   <div class="footer">Pixi is an early-stage prototype. Authentication, project authorization, retention controls, and a real voice-agent adapter remain future work.</div>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
-const state = { projects: [], scenarios: [], runs: [], projectId: "", scenarioId: "", runId: "" };
+const state = { projects: [], scenarios: [], runs: [], candidates: [], projectId: "", scenarioId: "", runId: "", candidateId: "" };
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -264,30 +298,40 @@ function renderRuns(preferredRunId) {
   });
   renderRunDetail(state.runs.find((r) => r.id === state.runId));
 }
-async function loadProjectData(preferredRunId) {
+async function loadProjectData(preferredRunId, preferredCandidateId) {
   if (!state.projectId) {
     state.scenarios = [];
     state.runs = [];
+    state.candidates = [];
     state.scenarioId = "";
     state.runId = "";
+    state.candidateId = "";
     renderScenarios();
     renderSelectedScenario();
     renderRuns();
+    renderCandidates();
     updateStats();
     return;
   }
   const results = await Promise.all([
     api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/scenarios"),
-    api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/runs")
+    api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/runs"),
+    api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/candidates")
   ]);
   state.scenarios = results[0];
   state.runs = results[1];
+  state.candidates = results[2];
+  if (preferredCandidateId) state.candidateId = preferredCandidateId;
   if (!state.scenarios.some((s) => s.id === state.scenarioId)) {
     state.scenarioId = state.scenarios.length ? state.scenarios[0].id : "";
+  }
+  if (!state.candidates.some((candidate) => candidate.id === state.candidateId)) {
+    state.candidateId = state.candidates.length ? state.candidates[0].id : "";
   }
   renderScenarios();
   renderSelectedScenario();
   renderRuns(preferredRunId);
+  renderCandidates();
   updateStats();
 }
 async function loadProjects(preferredId) {
@@ -371,6 +415,141 @@ $("run-form").addEventListener("submit", async (event) => {
   } catch (error) { notice(error.message, true); }
   finally { submit.disabled = false; submit.textContent = "▶ Evaluate fixture and save evidence"; }
 });
+function renderCandidates() {
+  const list = $("candidate-list");
+  list.replaceChildren();
+  if (!state.projectId) {
+    list.append(node("div", "empty", "Create a project to record a candidate."));
+    $("candidate-eval-fields").disabled = true;
+    renderCandidateDetail(null);
+    return;
+  }
+  if (!state.candidates.length) list.append(node("div", "empty", "No candidate changes saved yet."));
+  state.candidates.forEach((candidate) => {
+    const button = node("button", "run-item" + (candidate.id === state.candidateId ? " selected" : ""));
+    button.type = "button";
+    button.append(node("strong", "", candidate.hypothesis));
+    const latest = candidate.latest_evaluation;
+    button.append(node("span", "", candidate.status + (latest ? " · " + latest.outcome + " · " + latest.evidence_mode : "")));
+    button.addEventListener("click", () => {
+      state.candidateId = candidate.id;
+      renderCandidates();
+    });
+    list.append(button);
+  });
+  $("candidate-eval-fields").disabled = !state.candidateId;
+  renderCandidateDetail(state.candidates.find((candidate) => candidate.id === state.candidateId));
+}
+function renderCandidateDetail(candidate) {
+  const box = $("candidate-detail");
+  box.replaceChildren();
+  if (!candidate) {
+    box.append(node("div", "empty", "Select a candidate to inspect its latest evaluation."));
+    $("candidate-eval-fields").disabled = true;
+    $("candidate-accept").disabled = true;
+    $("candidate-reject").disabled = true;
+    return;
+  }
+  box.append(node("div", "detail-title", candidate.hypothesis));
+  const statusRow = node("div", "detail-row");
+  statusRow.append(node("strong", "", "Status"), statusTag(candidate.status));
+  box.append(statusRow);
+  const change = node("div", "detail-row");
+  change.append(node("strong", "", "Proposed change"), node("pre", "", candidate.proposed_change));
+  box.append(change);
+  const latest = candidate.latest_evaluation;
+  if (!latest) {
+    box.append(node("div", "empty", "No evaluation saved. Submit fixture controls to test the gate."));
+  } else {
+    const head = node("div", "detail-head");
+    head.append(node("div", "detail-title", "Latest evaluation"));
+    const badges = node("div");
+    badges.append(statusTag(latest.outcome), statusTag(latest.evidence_mode));
+    head.append(badges);
+    box.append(head);
+    const reason = node("div", "detail-row");
+    reason.append(node("strong", "", "Gate reason"), node("p", "", latest.reason));
+    box.append(reason);
+    const failed = node("div", "detail-row");
+    failed.append(node("strong", "", "Regressions"), node("p", "", latest.regression_count + " check(s); failed: " + (latest.failed_regressions || []).join(", ")));
+    box.append(failed);
+    if ((latest.critical_regressions || []).length) {
+      const safety = node("div", "detail-row");
+      safety.append(node("strong", "", "Safety gate"), node("p", "", "Critical regression: " + latest.critical_regressions.join(", ")));
+      box.append(safety);
+    }
+    if (latest.review_decision) {
+      const review = node("div", "detail-row");
+      review.append(node("strong", "", "Human review"), node("p", "", latest.review_decision + " by " + latest.reviewer + (latest.review_note ? " — " + latest.review_note : "")));
+      box.append(review);
+    }
+  }
+  const canApprove = Boolean(latest && latest.outcome === "passed" && latest.evidence_mode === "live");
+  $("candidate-eval-fields").disabled = false;
+  $("candidate-accept").disabled = !canApprove;
+  $("candidate-accept").title = canApprove ? "Records review only; does not deploy a change." : "A passing live-agent evaluation is required for approval.";
+  $("candidate-reject").disabled = !latest;
+}
+$("candidate-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearNotice();
+  if (!state.projectId || !state.scenarioId) {
+    notice("Create or select a scenario before recording a candidate.", true);
+    return;
+  }
+  const hypothesis = $("candidate-hypothesis").value.trim();
+  const proposedChange = $("candidate-change").value.trim();
+  if (!hypothesis || !proposedChange) {
+    notice("Provide both a hypothesis and proposed change.", true);
+    return;
+  }
+  try {
+    const candidate = await api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/candidates", {
+      method:"POST", body:{scenario_id:state.scenarioId,hypothesis,proposed_change:proposedChange}
+    });
+    $("candidate-hypothesis").value = "";
+    $("candidate-change").value = "";
+    await loadProjectData(undefined, candidate.id);
+    notice("Candidate recorded. Evaluation controls still use simulated evidence.", false);
+  } catch (error) { notice(error.message, true); }
+});
+$("candidate-eval-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearNotice();
+  if (!state.candidateId) { notice("Select a candidate first.", true); return; }
+  const targetChecks = [{
+    name:"target-fixture",passed:$("candidate-target-pass").checked,critical:false,error:null
+  }];
+  const regressions = $("candidate-missing-evidence").checked
+    ? [{name:"required-regression-evidence",passed:null,critical:false,error:"Simulated missing evidence"}]
+    : [{name:"baseline-regression",passed:$("candidate-regression-pass").checked,critical:false,error:null}];
+  if ($("candidate-critical-fail").checked) {
+    regressions.push({name:"critical-safety-regression",passed:false,critical:true,error:null});
+  }
+  try {
+    const candidate = await api("/api/v1/candidates/" + encodeURIComponent(state.candidateId) + "/evaluate", {
+      method:"POST",body:{setup_valid:true,applicable:true,target_checks:targetChecks,regression_checks:regressions}
+    });
+    await loadProjectData(undefined,candidate.id);
+    notice("Evaluation saved as simulated evidence: " + candidate.latest_evaluation.outcome + ".", false);
+  } catch (error) { notice(error.message, true); }
+});
+async function submitCandidateReview(decision) {
+  clearNotice();
+  const reviewer = $("candidate-reviewer").value.trim();
+  if (!state.candidateId) { notice("Select a candidate first.", true); return; }
+  if (!reviewer) { notice("Enter a reviewer name.", true); return; }
+  try {
+    const candidate = await api("/api/v1/candidates/" + encodeURIComponent(state.candidateId) + "/review", {
+      method:"POST",body:{decision,reviewer,note:$("candidate-review-note").value.trim() || null}
+    });
+    await loadProjectData(undefined,candidate.id);
+    notice(decision === "accept" ? "Review approved; no production change was applied." : "Candidate rejected and review saved.", false);
+  } catch (error) { notice(error.message, true); }
+}
+$("candidate-accept").addEventListener("click", () => submitCandidateReview("accept"));
+$("candidate-reject").addEventListener("click", () => submitCandidateReview("reject"));
+
 async function initialize() {
   if (location.protocol === "file:") {
     $("api-status").textContent = "Open via local server";
