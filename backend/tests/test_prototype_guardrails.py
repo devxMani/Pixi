@@ -12,9 +12,5 @@ def test_prototype_is_branded_as_pixi():
 
 
 def test_prototype_escape_helper_encodes_html_special_characters():
-    expected = (
-        'const esc=s=>String(s==null?"":s)'
-        '.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")'
-        '.replace(/"/g,"&quot;").replace(/\\'/g,"&#39;");'
-    )
+    expected = """const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");"""
     assert expected in HTML
