@@ -635,6 +635,9 @@ async function runCandidateSuite(candidateId) {
 
     // Retain the attempt keys until the saved history refresh succeeds. If the refresh
     // fails, a retry repeats requests with the same keys instead of making duplicate calls.
+    // Let the refresh preselect the newest target/regression runs from this suite.
+    $("candidate-target-run").selectedIndex = -1;
+    $("candidate-regression-runs").selectedIndex = -1;
     await loadProjectData(results.length ? results[results.length - 1].id : undefined, candidateId);
     pendingCandidateSuiteAttempt = null;
     const passed = results.filter((run) => run.status === "passed").length;
@@ -642,7 +645,14 @@ async function runCandidateSuite(candidateId) {
     const inconclusive = results.filter((run) => run.status === "inconclusive").length;
     const versions = Array.from(new Set(results.map((run) => run.agent_version).filter(Boolean)));
     const versionLabel = versions.length === 1 ? versions[0] : versions.length === 0 ? "missing" : "inconsistent";
-    const isClean = failed === 0 && inconclusive === 0 && versions.length === 1;
+    const isClean = failed === 0 &&
+      inconclusive === 0 &&
+      versions.length === 1 &&
+      results.every((run) =>
+        Boolean(run.agent_version) &&
+        run.variant === "candidate" &&
+        run.candidate_id === candidateId
+      );
     notice(
       "Candidate suite saved " + results.length + " run(s): " + passed + " passed, " +
       failed + " failed, " + inconclusive + " inconclusive. Candidate version(s): " +
