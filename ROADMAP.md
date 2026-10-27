@@ -38,6 +38,7 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Define a provider-neutral async adapter contract.
 - [x] Implement a fixture adapter for deterministic CI; it always emits simulated evidence.
 - [x] Add a configurable HTTP JSON bridge adapter and live-run API route with strict response schema, bounded timeouts, and HTTPS requirement outside local development.
+- [x] Version the bridge protocol with candidate ID, variant, and immutable agent-version provenance.
 - [x] Document the provider-neutral bridge request/response contract.
 - [ ] Choose the first real voice-agent runtime from the agent stack to be evaluated and verify a bridge against it.
 - [ ] Add runtime-specific support for audio turns, interruptions/barge-in, VAD/endpointing, and detailed tool traces.
@@ -50,8 +51,8 @@ Milestones are complete only when code and reproducible evidence support them.
 - [ ] Connect real-agent run history to the workspace.
 - [ ] Make live-vs-simulated evidence provenance visually unambiguous in every view.
 - [x] Implement candidate hypotheses/changes, gate evaluation snapshots, and human-review records; release approval remains locked for simulated evidence.
-- [ ] Connect candidate evaluation to real adapter runs and real agent-version diffs.
-- [ ] Demonstrate one reproducible accepted improvement and one reproducible rejected regression.
+- [x] Gate a candidate using persisted baseline, candidate-target, and same-version candidate regression runs; fixture/manual checks cannot satisfy the live-evidence gate.
+- [ ] Demonstrate one reproducible accepted improvement and one reproducible rejected critical regression against an actual configured staging agent.
 
 ## Phase 5 — Product hardening
 
