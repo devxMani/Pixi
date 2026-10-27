@@ -4,7 +4,7 @@
 
 Pixi is an early-stage project exploring a closed-loop testing and reliability workflow for voice agents: scenario execution, evidence-backed failure analysis, small reversible candidate changes, and conservative regression-gated decisions.
 
-> Status: early prototype plus the first API scaffold. The browser prototype remains in index.html. The API now persists development projects, scenarios, simulated demo runs, observations, and checks. It still does not connect to a real voice agent. Do not treat simulated runs as live-provider evidence.
+> Status: early prototype plus the first API-backed local workspace. The Miso UI is preserved at the root page. The Reliability Workspace now supports projects, scenarios, simulated fixture runs, saved observations, assertion results, and run history. It still does not connect to a real voice agent. Do not treat simulated runs as live-provider evidence.
 
 ## Product direction
 
@@ -12,19 +12,7 @@ The MVP is for engineers building voice agents who need to investigate interrupt
 
 See Product specification at docs/PRODUCT_SPEC.md, Architecture at docs/ARCHITECTURE.md, Prototype audit at docs/PROTOTYPE_AUDIT.md, Roadmap at ROADMAP.md, Engineering guide at docs/ENGINEERING_GUIDE.md, and Contributing at CONTRIBUTING.md.
 
-## Current repository
-
-- index.html — preserved exported browser prototype.
-- backend/app/domain/evaluation.py — pure conservative experiment decision policy.
-- backend/app/domain/scenarios.py and scenario_runner.py — scenario/assertion contracts and conservative result classification.
-- backend/app/adapters/ — provider-neutral adapter protocol plus a fixture adapter explicitly marked simulated.
-- backend/app/db.py and models.py — SQLAlchemy database/session and initial data models.
-- backend/migrations/ — Alembic schema migration.
-- backend/app/main.py — health, project/scenario CRUD, simulated-run, history, and decision endpoints.
-- backend/tests/ — policy, scenario, persistence, API, and prototype guardrail tests.
-- .github/workflows/backend-ci.yml — backend tests, lint, migration and prototype syntax checks.
-
-## Run the API locally
+## Run locally
 
 Requires Python 3.11+.
 
@@ -34,29 +22,31 @@ Requires Python 3.11+.
 4. Set APP_ENV=development in your local shell.
 5. Run alembic upgrade head.
 6. Run uvicorn app.main:app --reload.
+7. Open http://127.0.0.1:8000 for the original Miso prototype or http://127.0.0.1:8000/console.html for the API-backed Reliability Workspace.
 
-Then open http://127.0.0.1:8000/docs for the interactive API docs; health is at http://127.0.0.1:8000/health.
+The API docs are at http://127.0.0.1:8000/docs and the health endpoint is http://127.0.0.1:8000/health.
 
 Tests: run pytest from backend. Lint: run ruff check app tests from backend.
 
-The demo-run endpoint evaluates fixture output, not a real agent. Its evidence is always marked simulated. The API defaults to disabled outside development; use it only locally until authentication and project authorization are implemented.
+## Current functionality
 
-## Evaluation safety contract
+- Evidence policy distinguishes passed, failed, inconclusive, invalid_setup, and not_applicable outcomes.
+- Scenario assertions cover response text, prohibited phrases, latency limits, and tool-call expectations.
+- Projects, scenarios, runs, observations, and checks persist through SQLAlchemy/Alembic.
+- The workspace shows persisted run history and the source of evidence.
+- The fixture runner is explicitly simulated; no model call, phone call, or external agent is made.
 
-Pixi distinguishes passed, failed, inconclusive, invalid_setup, and not_applicable. A missing observation, provider error, incomplete regression suite, empty regression suite, or invalid precondition cannot be counted as a pass. Critical safety regressions block acceptance.
+## Safety and limitations
+
+The API defaults to disabled unless APP_ENV=development. This is intentionally local-development-only because authentication and project authorization are not implemented yet. Never expose this development API publicly or use it for real customer transcripts/audio. Provider credentials must remain server-side. Data redaction, retention controls, rate limiting, candidate/version persistence, and production deployment hardening remain future work.
 
 ## Near-term build plan
 
-1. Inventory the HTML prototype and preserve its current behavior.
-2. Stabilize testable evaluation rules and CI.
-3. Add typed persistence models and database migrations — the first local persistence increment now exists.
-4. Add and verify a real voice-agent adapter behind the provider-neutral contract.
-5. Implement candidate patches, regression-gated decisions, version history, and human approval.
-6. Integrate the UI with durable run/evidence APIs and add authentication/privacy boundaries before customer data is stored.
-
-## Security
-
-Never commit real secrets, call recordings, or private transcripts. Provider credentials must remain server-side. The API is development-only: all /api/v1 routes return 503 unless APP_ENV=development. Authentication, project authorization, rate limiting, retention controls, and deployment hardening are not implemented yet.
+1. Choose the first real voice-agent runtime to evaluate.
+2. Implement a server-side adapter with evidence provenance and bounded live tests.
+3. Add candidate patches, version history, regression gates, and human approval.
+4. Add authentication/project isolation and data handling controls.
+5. Connect real-agent history and evidence to the workspace.
 
 ## License
 

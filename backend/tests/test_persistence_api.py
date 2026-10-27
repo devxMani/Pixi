@@ -80,6 +80,12 @@ def test_project_scenario_demo_run_is_persisted_and_explicitly_simulated(client:
     assert saved.json()["scenario_snapshot"]["name"] == "Pricing answer"
     assert saved.json()["observations"][0]["transcript"] == "The basic plan costs $20 per month."
 
+    history = client.get(f"/api/v1/projects/{project_id}/runs")
+    assert history.status_code == 200
+    assert len(history.json()) == 1
+    assert history.json()[0]["id"] == run["id"]
+    assert history.json()[0]["evidence_mode"] == "simulated"
+
 
 def test_fixture_provider_error_is_saved_as_inconclusive(client: TestClient):
     project_id, scenario_id = create_project_and_scenario(client)
@@ -108,3 +114,12 @@ def test_api_is_disabled_outside_development(client: TestClient, monkeypatch: py
     monkeypatch.setenv("APP_ENV", "production")
     response = client.get("/api/v1/projects")
     assert response.status_code == 503
+
+
+def test_browser_entrypoints_are_served_by_the_api(client: TestClient):
+    prototype = client.get("/")
+    console = client.get("/console.html")
+    assert prototype.status_code == 200
+    assert "Talk to Miso" in prototype.text
+    assert console.status_code == 200
+    assert "Reliability Workspace" in console.text

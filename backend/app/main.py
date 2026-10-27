@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -21,9 +23,10 @@ from app.schemas import EvaluateInput, FixtureObservationInput, ProjectCreate, S
 
 app = FastAPI(
     title="Pixi API",
-    version="0.2.0",
+    version="0.3.0",
     description="Development API for voice-agent scenario evaluation and evidence history.",
 )
+ROOT_DIR = Path(__file__).resolve().parents[2]
 
 
 def require_development() -> None:
@@ -91,6 +94,18 @@ def _serialize_run(db: Session, run: RunRecord) -> dict[str, object]:
             for item in checks
         ],
     }
+
+
+@app.get("/", include_in_schema=False)
+def prototype_page() -> FileResponse:
+    """Serve the preserved Miso prototype from the same origin as the local API."""
+    return FileResponse(ROOT_DIR / "index.html")
+
+
+@app.get("/console.html", include_in_schema=False)
+def console_page() -> FileResponse:
+    """Serve the API-backed project and evidence workspace."""
+    return FileResponse(ROOT_DIR / "console.html")
 
 
 @app.get("/health")
@@ -178,6 +193,22 @@ def list_scenarios(
         }
         for item in scenarios
     ]
+
+
+@router.get("/projects/{project_id}/runs")
+def list_project_runs(
+    project_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[dict[str, object]]:
+    _project_or_404(db, project_id)
+    runs = db.scalars(
+        select(RunRecord)
+        .where(RunRecord.project_id == project_id)
+        .order_by(RunRecord.started_at.desc())
+        .limit(limit)
+    ).all()
+    return [_serialize_run(db, run) for run in runs]
 
 
 @router.post("/projects/{project_id}/scenarios/{scenario_id}/demo-runs", status_code=201)

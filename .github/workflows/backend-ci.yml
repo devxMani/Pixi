@@ -5,12 +5,14 @@ on:
     paths:
       - "backend/**"
       - "index.html"
+      - "console.html"
       - "scripts/check_prototype.py"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
       - "backend/**"
       - "index.html"
+      - "console.html"
       - "scripts/check_prototype.py"
       - ".github/workflows/backend-ci.yml"
 
@@ -37,7 +39,7 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Check database migration against SQLite
         run: DATABASE_URL=sqlite:///./pixi_migration_ci.db alembic upgrade head
-      - name: Check prototype JavaScript syntax
+      - name: Check prototype and workspace JavaScript syntax
         run: python ../scripts/check_prototype.py
       - name: Run tests
         run: pytest

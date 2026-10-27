@@ -9,8 +9,7 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Create GitHub repository and version the baseline.
 - [x] Normalize branding and strengthen dynamic HTML escaping.
 - [x] Add prototype JavaScript syntax validation in CI.
-- [ ] Tag the baseline and complete a full security/dependency/API audit.
-- [ ] Inventory every prototype action and runtime assumption.
+- [ ] Complete a full security/dependency/API audit and inventory every prototype action.
 
 ## Phase 1 — Evaluation correctness
 
@@ -19,14 +18,15 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Define scenario/assertion contracts for transcript text, latency, and tool-call evidence.
 - [x] Add a provider-neutral async adapter protocol and explicit simulated fixture adapter.
 - [x] Test scenario pass/fail/inconclusive outcomes and adapter errors.
-- [x] Add CI for tests, lint, migration, and prototype syntax checks.
-- [ ] Expand tests for retries, nondeterminism, and every experiment state transition.
+- [x] Add CI for tests, lint, migration, and browser JavaScript syntax checks.
 
 ## Phase 2 — Durable backend
 
 - [x] Add SQLAlchemy persistence models and an initial Alembic migration.
 - [x] Persist projects, scenarios, simulated runs, observations, and assertion results.
 - [x] Add API tests for saved history, errors, project scoping and the development-only guard.
+- [x] Serve the original prototype and the API-backed workspace through FastAPI.
+- [x] Add a run-history endpoint used by the workspace.
 - [ ] Add candidate/version/decision persistence, idempotency, export/restore and restart tests.
 - [ ] Add authentication/project authorization before storing private data.
 
@@ -41,9 +41,9 @@ Milestones are complete only when code and reproducible evidence support them.
 
 ## Phase 4 — Product workflow
 
-- [ ] Connect the existing UI to API-backed project, scenario, and run history.
-- [ ] Make simulated and live evidence visually unambiguous in every view.
-- [ ] Show transcripts, events, latency and trace references where available.
+- [x] Create a local API-backed UI for projects, scenarios, fixture runs, checks, and saved history.
+- [ ] Connect real-agent run history to the workspace.
+- [ ] Make live-vs-simulated evidence provenance visually unambiguous in every view.
 - [ ] Implement candidate diffs and human-reviewed decisions.
 - [ ] Demonstrate one reproducible accepted improvement and one reproducible rejected regression.
 
