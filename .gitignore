@@ -14,6 +14,11 @@ __pycache__/
 .venv/
 venv/
 
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Frontend / tooling
 node_modules/
 dist/

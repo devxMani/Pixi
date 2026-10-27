@@ -35,6 +35,8 @@ jobs:
           node-version: "22"
       - name: Install dependencies
         run: pip install -e ".[dev]"
+      - name: Check database migration against SQLite
+        run: DATABASE_URL=sqlite:///./pixi_migration_ci.db alembic upgrade head
       - name: Check prototype JavaScript syntax
         run: python ../scripts/check_prototype.py
       - name: Run tests
