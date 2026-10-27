@@ -106,6 +106,7 @@ def install_bridge(
     target_scenario_id: str,
     regression_fails: bool = False,
     same_version: bool = False,
+    different_regression_version: bool = False,
 ) -> list[dict[str, object]]:
     calls: list[dict[str, object]] = []
 
@@ -127,7 +128,12 @@ def install_bridge(
             candidate_id = None
         else:
             candidate_id = experiment["candidate"]["id"]
-            version = "agent-base-v1" if same_version else "agent-candidate-v2"
+            if same_version:
+                version = "agent-base-v1"
+            elif different_regression_version and scenario["id"] != target_scenario_id:
+                version = "agent-candidate-v3"
+            else:
+                version = "agent-candidate-v2"
             if scenario["id"] == target_scenario_id:
                 transcript = "The basic plan costs $20 per month."
                 tools = ["get_pricing"]
@@ -315,6 +321,36 @@ def test_identical_baseline_and_candidate_version_cannot_validate_a_change(
     result = response.json()
     assert result["latest_evaluation"]["outcome"] == "invalid_setup"
     assert result["status"] == "invalid_setup"
+
+
+
+
+def test_candidate_gate_rejects_mixed_agent_versions_across_regression_runs(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_id, target_id, regression_id, candidate_id = create_project_scenarios_and_candidate(client)
+    install_bridge(
+        monkeypatch,
+        target_scenario_id=target_id,
+        different_regression_version=True,
+    )
+    baseline = run_live(client, project_id, target_id, key="baseline-mixed-version")
+    target = run_live(
+        client, project_id, target_id, candidate_id=candidate_id, key="candidate-target-version-v2"
+    )
+    regression = run_live(
+        client, project_id, regression_id, candidate_id=candidate_id, key="candidate-regression-version-v3"
+    )
+
+    assert target["agent_version"] == "agent-candidate-v2"
+    assert regression["agent_version"] == "agent-candidate-v3"
+    response = evaluate_runs(client, candidate_id, baseline, target, [regression])
+
+    assert response.status_code == 201, response.text
+    result = response.json()
+    assert result["latest_evaluation"]["outcome"] == "invalid_setup"
+    assert result["status"] == "invalid_setup"
+    assert "version" in result["latest_evaluation"]["reason"].lower()
 
 
 def test_candidate_gate_requires_every_project_regression_scenario(

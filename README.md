@@ -39,7 +39,7 @@ Tests: run `pytest` from `backend`. Lint: run `ruff check app tests` from `backe
 - Supplying an `Idempotency-Key` header on a demo-run request makes retries return the original run; reusing the same key for different input returns HTTP 409.
 - A fixture run is clearly marked simulated. Exported data does not convert simulated evidence into live evidence.
 - A configurable server-side HTTP JSON bridge can execute baseline and candidate-variant scenarios through `POST /api/v1/projects/{project_id}/scenarios/{scenario_id}/agent-runs` (`?candidate_id=...` selects a candidate variant). It follows the strict protocol in `docs/AGENT_BRIDGE.md`; it is not a vendor-specific integration.
-- Candidate gate evaluations can be based on persisted run IDs, immutable agent versions, a failed baseline target, a passing candidate target, and passing candidate regression runs. Critical regressions block approval; fixture evidence never satisfies the live gate.
+- Candidate gate evaluations use persisted run IDs and immutable agent versions. They require a failed baseline target, a passing candidate target, and passing candidate runs for every non-target scenario in the project. Critical regressions block approval; partial suites, mixed candidate versions, and fixture evidence cannot satisfy the live gate.
 - Restore preserves historical evidence and review decisions but does not re-run agents or apply candidates. Older exports without immutable agent versions remain ineligible for the versioned live-candidate gate.
 
 ## Safety and limitations
