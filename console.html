@@ -124,12 +124,12 @@
       <div>
         <form id="candidate-eval-form">
           <fieldset id="candidate-eval-fields" disabled style="border:0;padding:0;margin:0;min-width:0">
-            <div class="field"><label>Evaluation fixture controls</label>
+            <div class="field"><label>Simulated policy sandbox</label>
               <label class="toggle"><input id="candidate-target-pass" type="checkbox" checked> Target checks pass</label>
               <label class="toggle"><input id="candidate-regression-pass" type="checkbox" checked> Baseline regressions pass</label>
               <label class="toggle"><input id="candidate-critical-fail" type="checkbox"> A critical safety regression fails</label>
               <label class="toggle"><input id="candidate-missing-evidence" type="checkbox"> Required regression evidence is missing</label>
-              <span class="hint">These controls test the policy with fixture values only; no model or external voice agent runs.</span>
+              <span class="hint">These controls only test the decision policy with simulated values. They never establish live evidence or approve a release.</span>
             </div>
             <button class="btn full" type="submit">Evaluate candidate gate</button>
           </fieldset>
@@ -359,7 +359,7 @@ async function loadProjectData(preferredRunId, preferredCandidateId) {
   }
   const results = await Promise.all([
     api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/scenarios"),
-    api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/runs"),
+    api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/runs?limit=100"),
     api("/api/v1/projects/" + encodeURIComponent(state.projectId) + "/candidates")
   ]);
   state.scenarios = results[0];
@@ -558,7 +558,6 @@ async function runConfiguredAgent(candidateId) {
   const defaultText = candidateId ? "↗ Run selected candidate variant" : "↗ Run baseline scenario";
   button.disabled = true;
   button.textContent = "Calling configured agent…";
-  let persistedRun = false;
   try {
     const suffix = candidateId ? "?candidate_id=" + encodeURIComponent(candidateId) : "";
     const run = await api(
@@ -566,9 +565,10 @@ async function runConfiguredAgent(candidateId) {
       "/scenarios/" + encodeURIComponent(state.scenarioId) + "/agent-runs" + suffix,
       {method:"POST", headers:{"Idempotency-Key":pendingLiveRunAttempt.key}}
     );
-    persistedRun = true;
-    pendingLiveRunAttempt = null;
+    // Clear the retry key only after refreshing persisted history successfully.
+    // If the UI refresh fails after the run was saved, a retry must reuse the same key.
     await loadProjectData(run.id, candidateId || undefined);
+    pendingLiveRunAttempt = null;
     notice(
       "Agent bridge run saved: " + run.status + " (" + run.evidence_mode + ", " +
       run.variant + ", version " + (run.agent_version || "missing") + "). Inspect the evidence before using it for a release decision.",
