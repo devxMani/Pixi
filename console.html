@@ -41,6 +41,17 @@
       <div class="panel-head"><div><h2>Workspace</h2><p class="subcopy">Choose the project you want to evaluate.</p></div><span class="number">01</span></div>
       <div class="field"><label for="project-select">Active project</label><select id="project-select"><option value="">Loading projects…</option></select></div>
       <button class="btn secondary full" id="export-project" type="button" disabled>↓ Export project backup</button>
+      <div class="rule"></div>
+      <div class="field">
+        <label for="import-project-file">Restore from JSON backup</label>
+        <input id="import-project-file" type="file" accept=".json,application/json">
+        <span class="hint">Creates a separate restored project; it will not overwrite this project. Maximum file size: 10 MB.</span>
+      </div>
+      <div class="field">
+        <label for="import-project-name">Restored project name (optional)</label>
+        <input id="import-project-name" maxlength="120" placeholder="Defaults to “(restored)”">
+      </div>
+      <button class="btn secondary full" id="import-project" type="button" disabled>↻ Restore project copy</button>
       <form id="project-form">
         <div class="field"><label for="project-name">Create a project</label><input id="project-name" maxlength="120" placeholder="e.g. Support voice agent" required></div>
         <button class="btn secondary full" type="submit">＋ Create project</button>
@@ -398,12 +409,58 @@ $("export-project").addEventListener("click", async () => {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    notice("Project backup downloaded. Keep it somewhere safe; backup import is not available yet.", false);
+    notice("Project backup downloaded. Restoring it creates a separate project copy and does not overwrite this one.", false);
   } catch (error) {
     notice(error.message || "Could not export this project.", true);
   } finally {
     button.disabled = !state.projectId;
     button.textContent = "↓ Export project backup";
+  }
+});
+$("import-project-file").addEventListener("change", () => {
+  $("import-project").disabled = !($("import-project-file").files && $("import-project-file").files[0]);
+});
+$("import-project").addEventListener("click", async () => {
+  clearNotice();
+  const file = $("import-project-file").files && $("import-project-file").files[0];
+  if (!file) {
+    notice("Choose a Pixi JSON backup file first.", true);
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    notice("Backup file is larger than the 10 MB restore limit.", true);
+    return;
+  }
+  const button = $("import-project");
+  button.disabled = true;
+  button.textContent = "Validating and restoring…";
+  try {
+    let snapshot;
+    try {
+      snapshot = JSON.parse(await file.text());
+    } catch (_) {
+      throw new Error("This file is not valid JSON.");
+    }
+    if (!snapshot || typeof snapshot !== "object" || snapshot.schema_version !== 1) {
+      throw new Error("Unsupported backup format. Choose a Pixi schema-version-1 JSON export.");
+    }
+    const override = $("import-project-name").value.trim();
+    const requestBody = {...snapshot, name_override: override || null};
+    const restored = await api("/api/v1/projects/import", {method:"POST", body:requestBody});
+    $("import-project-file").value = "";
+    $("import-project-name").value = "";
+    await loadProjects(restored.id);
+    notice(
+      "Project restored as a separate copy: " + restored.name + ". " +
+      restored.counts.runs + " runs and " + restored.counts.evaluations +
+      " candidate evaluations were restored with remapped IDs.",
+      false
+    );
+  } catch (error) {
+    notice(error.message || "Could not restore this backup.", true);
+  } finally {
+    button.disabled = !($("import-project-file").files && $("import-project-file").files[0]);
+    button.textContent = "↻ Restore project copy";
   }
 });
 $("project-select").addEventListener("change", async (event) => {
