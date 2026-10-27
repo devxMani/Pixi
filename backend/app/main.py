@@ -341,32 +341,32 @@ async def create_demo_run(
         started_at=started_at,
         finished_at=finished_at,
     )
-    db.add(run)
-    db.flush()
-    observation = ObservationRecord(
-        id=str(uuid4()),
-        run_id=run.id,
-        transcript=result.observation.transcript,
-        latency_ms=result.observation.latency_ms,
-        tools_called=result.observation.tools_called,
-        error=result.observation.error,
-        evidence_mode=result.observation.evidence_mode.value,
-        provider=result.observation.provider,
-        model=result.observation.model,
-    )
-    db.add(observation)
-    for sequence, check in enumerate(result.checks):
-        db.add(
-            CheckRecord(
-                id=str(uuid4()),
-                run_id=run.id,
-                sequence=sequence,
-                assertion_id=check.name,
-                passed=check.passed,
-                error=check.error,
-            )
-        )
     try:
+        db.add(run)
+        db.flush()
+        observation = ObservationRecord(
+            id=str(uuid4()),
+            run_id=run.id,
+            transcript=result.observation.transcript,
+            latency_ms=result.observation.latency_ms,
+            tools_called=result.observation.tools_called,
+            error=result.observation.error,
+            evidence_mode=result.observation.evidence_mode.value,
+            provider=result.observation.provider,
+            model=result.observation.model,
+        )
+        db.add(observation)
+        for sequence, check in enumerate(result.checks):
+            db.add(
+                CheckRecord(
+                    id=str(uuid4()),
+                    run_id=run.id,
+                    sequence=sequence,
+                    assertion_id=check.name,
+                    passed=check.passed,
+                    error=check.error,
+                )
+            )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
