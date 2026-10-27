@@ -21,7 +21,7 @@ async def run_scenario(adapter: AgentAdapter, scenario: Scenario) -> ScenarioRes
                 evidence_mode=adapter.evidence_mode,
                 provider=adapter.name,
             )
-    except Exception as exc:  # provider errors should become visible evidence, not a pass
+    except Exception as exc:  # noqa: BLE001 - adapter failures must remain inconclusive evidence
         observation = AgentObservation(
             error=f"{type(exc).__name__}: {exc}",
             evidence_mode=adapter.evidence_mode,
