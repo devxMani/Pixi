@@ -146,6 +146,7 @@ def test_project_export_includes_scenarios_runs_observations_and_candidate_histo
     restored_run = restored_runs[0]
     restored_candidate = restored_candidates[0]
     assert restored_scenario_id != scenario_id
+    assert restored_scenarios[0]["definition"]["id"] == restored_scenario_id
     assert restored_scenario_id == restored_run["scenario_id"]
     assert restored_run["id"] != run_response.json()["id"]
     assert restored_run["scenario_snapshot"]["id"] == restored_scenario_id
