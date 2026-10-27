@@ -52,6 +52,7 @@ class RunRecord(Base):
     __table_args__ = (
         Index("ix_runs_project_started", "project_id", "started_at"),
         Index("ix_runs_scenario_started", "scenario_id", "started_at"),
+        Index("ix_runs_candidate_variant_started", "candidate_id", "variant", "started_at"),
         Index("uq_runs_idempotency_key", "project_id", "scenario_id", "idempotency_key", unique=True),
     )
 
@@ -68,6 +69,11 @@ class RunRecord(Base):
     scenario_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     idempotency_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    candidate_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("candidates.id", ondelete="SET NULL"), nullable=True
+    )
+    variant: Mapped[str] = mapped_column(String(20), nullable=False, default="simulated")
+    agent_version: Mapped[str | None] = mapped_column(String(200), nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
