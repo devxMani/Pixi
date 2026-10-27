@@ -263,31 +263,48 @@ class ProjectImportInput(BaseModel):
                 if snapshot.get("source") != "persisted_run_evidence":
                     continue
 
-                baseline = snapshot.get("baseline") or {}
-                target = snapshot.get("candidate_target") or {}
+                baseline = snapshot.get("baseline")
+                target = snapshot.get("candidate_target")
+                if not isinstance(baseline, dict) or not isinstance(target, dict):
+                    raise ValueError("An evidence evaluation must include baseline and candidate target details.")
                 baseline_id = baseline.get("run_id")
                 target_id = target.get("run_id")
-                if baseline_id not in run_id_set or target_id not in run_id_set:
+                if (
+                    not isinstance(baseline_id, str)
+                    or not isinstance(target_id, str)
+                    or baseline_id not in run_id_set
+                    or target_id not in run_id_set
+                ):
                     raise ValueError("An evaluation snapshot references a run absent from the backup.")
                 baseline_run = run_by_id[baseline_id]
                 target_run = run_by_id[target_id]
                 if (
-                    baseline_run.variant not in (None, "baseline")
+                    baseline_run.evidence_mode != "live"
+                    or baseline_run.variant not in (None, "baseline")
                     or baseline_run.candidate_id is not None
+                    or baseline_run.scenario_id != candidate.scenario_id
+                    or target_run.evidence_mode != "live"
                     or target_run.variant != "candidate"
                     or target_run.candidate_id != candidate.id
+                    or target_run.scenario_id != candidate.scenario_id
                 ):
                     raise ValueError("Evaluation baseline/target provenance does not match the candidate.")
                 target_snapshot_candidate_id = target.get("candidate_id")
-                if target_snapshot_candidate_id is not None and target_snapshot_candidate_id != candidate.id:
+                if target_snapshot_candidate_id != candidate.id:
                     raise ValueError("Evaluation target snapshot references a different candidate.")
-                for regression in snapshot.get("regressions", []):
+                regressions = snapshot.get("regressions")
+                if not isinstance(regressions, list) or not regressions:
+                    raise ValueError("An evidence evaluation must include at least one regression run.")
+                for regression in regressions:
+                    if not isinstance(regression, dict):
+                        raise ValueError("Regression evidence entries must be objects.")
                     regression_id = regression.get("run_id")
-                    if regression_id not in run_id_set:
+                    if not isinstance(regression_id, str) or regression_id not in run_id_set:
                         raise ValueError("A regression snapshot references a run absent from the backup.")
                     regression_run = run_by_id[regression_id]
                     if (
-                        regression_run.variant != "candidate"
+                        regression_run.evidence_mode != "live"
+                        or regression_run.variant != "candidate"
                         or regression_run.candidate_id != candidate.id
                         or regression.get("scenario_id") != regression_run.scenario_id
                     ):
