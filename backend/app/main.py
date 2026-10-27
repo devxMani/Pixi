@@ -1,15 +1,19 @@
 """Pixi FastAPI application entrypoint."""
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.adapters.fake import FixtureAgentAdapter
@@ -270,12 +274,48 @@ async def create_demo_run(
     scenario_id: str,
     fixture: FixtureObservationInput,
     db: Annotated[Session, Depends(get_db)],
+    response: Response,
+    idempotency_key: Annotated[
+        str | None, Header(alias="Idempotency-Key", min_length=1, max_length=200)
+    ] = None,
 ) -> dict[str, object]:
-    """Run a fixture only; this endpoint never talks to an external model or phone agent."""
+    """Run a fixture only; retries with one idempotency key create at most one saved run."""
     _project_or_404(db, project_id)
     scenario_record = db.get(ScenarioRecord, scenario_id)
     if scenario_record is None or scenario_record.project_id != project_id:
         raise HTTPException(status_code=404, detail="Scenario not found in this project.")
+
+    if idempotency_key is not None:
+        idempotency_key = idempotency_key.strip()
+        if not idempotency_key:
+            raise HTTPException(status_code=422, detail="Idempotency-Key cannot be blank.")
+        canonical_payload = json.dumps(
+            {
+                "scenario_id": scenario_id,
+                "fixture": fixture.model_dump(mode="json"),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        fingerprint = hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+        existing = db.scalars(
+            select(RunRecord).where(
+                RunRecord.project_id == project_id,
+                RunRecord.scenario_id == scenario_id,
+                RunRecord.idempotency_key == idempotency_key,
+            )
+        ).first()
+        if existing is not None:
+            if existing.idempotency_fingerprint != fingerprint:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This Idempotency-Key was already used with a different request payload.",
+                )
+            response.status_code = 200
+            return _serialize_run(db, existing)
+    else:
+        fingerprint = None
 
     scenario = Scenario.model_validate(scenario_record.definition)
     adapter = FixtureAgentAdapter(
@@ -296,35 +336,57 @@ async def create_demo_run(
         evidence_mode=result.evidence_mode.value,
         status=result.status.value,
         scenario_snapshot=scenario.model_dump(mode="json"),
+        idempotency_key=idempotency_key,
+        idempotency_fingerprint=fingerprint,
         started_at=started_at,
         finished_at=finished_at,
     )
-    db.add(run)
-    db.flush()
-    observation = ObservationRecord(
-        id=str(uuid4()),
-        run_id=run.id,
-        transcript=result.observation.transcript,
-        latency_ms=result.observation.latency_ms,
-        tools_called=result.observation.tools_called,
-        error=result.observation.error,
-        evidence_mode=result.observation.evidence_mode.value,
-        provider=result.observation.provider,
-        model=result.observation.model,
-    )
-    db.add(observation)
-    for sequence, check in enumerate(result.checks):
-        db.add(
-            CheckRecord(
-                id=str(uuid4()),
-                run_id=run.id,
-                sequence=sequence,
-                assertion_id=check.name,
-                passed=check.passed,
-                error=check.error,
-            )
+    try:
+        db.add(run)
+        db.flush()
+        observation = ObservationRecord(
+            id=str(uuid4()),
+            run_id=run.id,
+            transcript=result.observation.transcript,
+            latency_ms=result.observation.latency_ms,
+            tools_called=result.observation.tools_called,
+            error=result.observation.error,
+            evidence_mode=result.observation.evidence_mode.value,
+            provider=result.observation.provider,
+            model=result.observation.model,
         )
-    db.commit()
+        db.add(observation)
+        for sequence, check in enumerate(result.checks):
+            db.add(
+                CheckRecord(
+                    id=str(uuid4()),
+                    run_id=run.id,
+                    sequence=sequence,
+                    assertion_id=check.name,
+                    passed=check.passed,
+                    error=check.error,
+                )
+            )
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if idempotency_key is not None:
+            existing = db.scalars(
+                select(RunRecord).where(
+                    RunRecord.project_id == project_id,
+                    RunRecord.scenario_id == scenario_id,
+                    RunRecord.idempotency_key == idempotency_key,
+                )
+            ).first()
+            if existing is not None and existing.idempotency_fingerprint == fingerprint:
+                response.status_code = 200
+                return _serialize_run(db, existing)
+            if existing is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This Idempotency-Key was concurrently used with a different request payload.",
+                ) from exc
+        raise
     db.refresh(run)
     return _serialize_run(db, run)
 
@@ -488,6 +550,98 @@ def evaluation_decision(payload: EvaluateInput) -> dict[str, object]:
         "failed_regressions": list(decision.failed_regressions),
         "critical_regressions": list(decision.critical_regressions),
     }
+
+
+@router.get("/projects/{project_id}/export")
+def export_project(
+    project_id: str,
+    db: Annotated[Session, Depends(get_db)],
+) -> JSONResponse:
+    """Export a complete, versioned project snapshot for a user-initiated backup."""
+    project = _project_or_404(db, project_id)
+    scenarios = db.scalars(
+        select(ScenarioRecord)
+        .where(ScenarioRecord.project_id == project_id)
+        .order_by(ScenarioRecord.created_at)
+    ).all()
+    runs = db.scalars(
+        select(RunRecord)
+        .where(RunRecord.project_id == project_id)
+        .order_by(RunRecord.started_at)
+    ).all()
+    candidates = db.scalars(
+        select(CandidateRecord)
+        .where(CandidateRecord.project_id == project_id)
+        .order_by(CandidateRecord.created_at)
+    ).all()
+
+    candidate_snapshots: list[dict[str, object]] = []
+    for candidate in candidates:
+        evaluations = db.scalars(
+            select(CandidateEvaluationRecord)
+            .where(CandidateEvaluationRecord.candidate_id == candidate.id)
+            .order_by(CandidateEvaluationRecord.created_at)
+        ).all()
+        candidate_snapshots.append(
+            {
+                "id": candidate.id,
+                "project_id": candidate.project_id,
+                "scenario_id": candidate.scenario_id,
+                "hypothesis": candidate.hypothesis,
+                "proposed_change": candidate.proposed_change,
+                "status": candidate.status,
+                "production_applied": candidate.production_applied,
+                "created_at": candidate.created_at,
+                "evaluations": [
+                    {
+                        "id": evaluation.id,
+                        "candidate_id": evaluation.candidate_id,
+                        "outcome": evaluation.outcome,
+                        "reason": evaluation.reason,
+                        "evidence_mode": evaluation.evidence_mode,
+                        "target_passed": evaluation.target_passed,
+                        "regression_count": evaluation.regression_count,
+                        "failed_regressions": evaluation.failed_regressions,
+                        "critical_regressions": evaluation.critical_regressions,
+                        "checks_snapshot": evaluation.checks_snapshot,
+                        "review_decision": evaluation.review_decision,
+                        "reviewer": evaluation.reviewer,
+                        "review_note": evaluation.review_note,
+                        "reviewed_at": evaluation.reviewed_at,
+                        "created_at": evaluation.created_at,
+                    }
+                    for evaluation in evaluations
+                ],
+            }
+        )
+
+    snapshot = {
+        "schema_version": 1,
+        "exported_at": datetime.now(UTC),
+        "project": {
+            "id": project.id,
+            "name": project.name,
+            "created_at": project.created_at,
+        },
+        "scenarios": [
+            {
+                "id": scenario.id,
+                "project_id": scenario.project_id,
+                "name": scenario.name,
+                "definition": scenario.definition,
+                "created_at": scenario.created_at,
+            }
+            for scenario in scenarios
+        ],
+        "runs": [_serialize_run(db, run) for run in runs],
+        "candidates": candidate_snapshots,
+    }
+    return JSONResponse(
+        content=jsonable_encoder(snapshot),
+        headers={
+            "Content-Disposition": f'attachment; filename="pixi-project-{project_id}.json"'
+        },
+    )
 
 
 app.include_router(router)

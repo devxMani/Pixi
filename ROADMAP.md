@@ -18,17 +18,19 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Define scenario/assertion contracts for transcript text, latency, and tool-call evidence.
 - [x] Add a provider-neutral async adapter protocol and explicit simulated fixture adapter.
 - [x] Test scenario pass/fail/inconclusive outcomes and adapter errors.
-- [x] Add CI for tests, lint, migration, and browser JavaScript syntax checks.
+- [x] Run automated tests, lint, migration, and browser JavaScript syntax checks in CI.
 
 ## Phase 2 — Durable backend
 
 - [x] Add SQLAlchemy persistence models and an initial Alembic migration.
 - [x] Persist projects, scenarios, simulated runs, observations, and assertion results.
-- [x] Add API tests for saved history, errors, project scoping and the development-only guard.
+- [x] Add API tests for saved history, errors, project scoping, and the development-only guard.
 - [x] Serve the original prototype and the API-backed workspace through FastAPI.
 - [x] Add a run-history endpoint used by the workspace.
 - [x] Persist candidate proposals, evaluation snapshots, and human-review decisions; simulated evidence cannot be approved for release.
-- [ ] Add agent version records, idempotency, export/restore and restart tests.
+- [x] Add retry-safe run creation using idempotency keys.
+- [x] Add a versioned JSON export for project evidence and evaluation history.
+- [ ] Add agent-version records, export restore/import, and restart/backup recovery tests.
 - [ ] Add authentication/project authorization before storing private data.
 
 ## Phase 3 — Agent adapter and scenarios
