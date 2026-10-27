@@ -8,7 +8,8 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -488,6 +489,98 @@ def evaluation_decision(payload: EvaluateInput) -> dict[str, object]:
         "failed_regressions": list(decision.failed_regressions),
         "critical_regressions": list(decision.critical_regressions),
     }
+
+
+@router.get("/projects/{project_id}/export")
+def export_project(
+    project_id: str,
+    db: Annotated[Session, Depends(get_db)],
+) -> JSONResponse:
+    """Export a complete, versioned project snapshot for a user-initiated backup."""
+    project = _project_or_404(db, project_id)
+    scenarios = db.scalars(
+        select(ScenarioRecord)
+        .where(ScenarioRecord.project_id == project_id)
+        .order_by(ScenarioRecord.created_at)
+    ).all()
+    runs = db.scalars(
+        select(RunRecord)
+        .where(RunRecord.project_id == project_id)
+        .order_by(RunRecord.started_at)
+    ).all()
+    candidates = db.scalars(
+        select(CandidateRecord)
+        .where(CandidateRecord.project_id == project_id)
+        .order_by(CandidateRecord.created_at)
+    ).all()
+
+    candidate_snapshots: list[dict[str, object]] = []
+    for candidate in candidates:
+        evaluations = db.scalars(
+            select(CandidateEvaluationRecord)
+            .where(CandidateEvaluationRecord.candidate_id == candidate.id)
+            .order_by(CandidateEvaluationRecord.created_at)
+        ).all()
+        candidate_snapshots.append(
+            {
+                "id": candidate.id,
+                "project_id": candidate.project_id,
+                "scenario_id": candidate.scenario_id,
+                "hypothesis": candidate.hypothesis,
+                "proposed_change": candidate.proposed_change,
+                "status": candidate.status,
+                "production_applied": candidate.production_applied,
+                "created_at": candidate.created_at,
+                "evaluations": [
+                    {
+                        "id": evaluation.id,
+                        "candidate_id": evaluation.candidate_id,
+                        "outcome": evaluation.outcome,
+                        "reason": evaluation.reason,
+                        "evidence_mode": evaluation.evidence_mode,
+                        "target_passed": evaluation.target_passed,
+                        "regression_count": evaluation.regression_count,
+                        "failed_regressions": evaluation.failed_regressions,
+                        "critical_regressions": evaluation.critical_regressions,
+                        "checks_snapshot": evaluation.checks_snapshot,
+                        "review_decision": evaluation.review_decision,
+                        "reviewer": evaluation.reviewer,
+                        "review_note": evaluation.review_note,
+                        "reviewed_at": evaluation.reviewed_at,
+                        "created_at": evaluation.created_at,
+                    }
+                    for evaluation in evaluations
+                ],
+            }
+        )
+
+    snapshot = {
+        "schema_version": 1,
+        "exported_at": datetime.now(UTC),
+        "project": {
+            "id": project.id,
+            "name": project.name,
+            "created_at": project.created_at,
+        },
+        "scenarios": [
+            {
+                "id": scenario.id,
+                "project_id": scenario.project_id,
+                "name": scenario.name,
+                "definition": scenario.definition,
+                "created_at": scenario.created_at,
+            }
+            for scenario in scenarios
+        ],
+        "runs": [_serialize_run(db, run) for run in runs],
+        "candidates": candidate_snapshots,
+    }
+    return JSONResponse(
+        content=jsonable_encoder(snapshot),
+        headers={
+            "Content-Disposition": f'attachment; filename="pixi-project-{project_id}.json"'
+        },
+    )
 
 
 app.include_router(router)
