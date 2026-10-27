@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -52,7 +52,7 @@ class RunRecord(Base):
     __table_args__ = (
         Index("ix_runs_project_started", "project_id", "started_at"),
         Index("ix_runs_scenario_started", "scenario_id", "started_at"),
-        UniqueConstraint("project_id", "scenario_id", "idempotency_key", name="uq_runs_idempotency_key"),
+        Index("uq_runs_idempotency_key", "project_id", "scenario_id", "idempotency_key", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
