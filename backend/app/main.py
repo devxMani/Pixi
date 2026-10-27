@@ -1,8 +1,9 @@
 """Pixi FastAPI application entrypoint."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import os
-from datetime import datetime, timezone
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
@@ -98,7 +99,9 @@ def health() -> dict[str, str]:
 
 
 @router.post("/projects", status_code=201)
-def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> dict[str, object]:
+def create_project(
+    payload: ProjectCreate, db: Annotated[Session, Depends(get_db)]
+) -> dict[str, object]:
     project = ProjectRecord(id=str(uuid4()), name=payload.name)
     db.add(project)
     db.commit()
@@ -108,8 +111,8 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> dic
 
 @router.get("/projects")
 def list_projects(
-    limit: int = Query(default=50, ge=1, le=200),
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[dict[str, object]]:
     projects = db.scalars(
         select(ProjectRecord).order_by(ProjectRecord.created_at.desc()).limit(limit)
@@ -124,7 +127,7 @@ def list_projects(
 def create_scenario(
     project_id: str,
     payload: ScenarioCreate,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
     _project_or_404(db, project_id)
     scenario_id = str(uuid4())
@@ -155,8 +158,8 @@ def create_scenario(
 @router.get("/projects/{project_id}/scenarios")
 def list_scenarios(
     project_id: str,
-    limit: int = Query(default=50, ge=1, le=200),
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[dict[str, object]]:
     _project_or_404(db, project_id)
     scenarios = db.scalars(
@@ -182,7 +185,7 @@ async def create_demo_run(
     project_id: str,
     scenario_id: str,
     fixture: FixtureObservationInput,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
     """Run a fixture only; this endpoint never talks to an external model or phone agent."""
     _project_or_404(db, project_id)
@@ -197,9 +200,9 @@ async def create_demo_run(
         tools_called=fixture.tools_called,
         error=fixture.error,
     )
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     result = await run_scenario(adapter, scenario)
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
 
     run = RunRecord(
         id=str(uuid4()),
@@ -243,7 +246,9 @@ async def create_demo_run(
 
 
 @router.get("/runs/{run_id}")
-def get_run(run_id: str, db: Session = Depends(get_db)) -> dict[str, object]:
+def get_run(
+    run_id: str, db: Annotated[Session, Depends(get_db)]
+) -> dict[str, object]:
     run = db.get(RunRecord, run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found.")
