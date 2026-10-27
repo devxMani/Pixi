@@ -12,8 +12,8 @@ from sqlalchemy.pool import StaticPool
 
 import app.main as main_module
 from app.adapters.http_json import HTTPJSONAgentAdapter
-from app.domain.scenarios import RunVariant
 from app.db import Base, get_db
+from app.domain.scenarios import RunVariant
 from app.main import app
 
 
@@ -160,7 +160,7 @@ def test_invalid_bridge_response_is_saved_as_inconclusive_not_passed(
     monkeypatch.setattr(
         main_module,
         "build_configured_http_adapter",
-        lambda: HTTPJSONAgentAdapter(
+        lambda candidate=None: HTTPJSONAgentAdapter(
             endpoint="https://bridge.example.test/evaluate",
             variant=RunVariant.CANDIDATE if candidate else RunVariant.BASELINE,
             candidate=candidate,
