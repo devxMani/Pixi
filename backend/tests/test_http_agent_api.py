@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 import app.main as main_module
 from app.adapters.http_json import HTTPJSONAgentAdapter
+from app.domain.scenarios import RunVariant
 from app.db import Base, get_db
 from app.main import app
 
@@ -82,27 +83,33 @@ def test_agent_run_persists_live_evidence_and_replays_idempotently(
         calls += 1
         assert request.headers["authorization"] == "Bearer test-secret"
         body = json.loads(request.content)
-        assert body["protocol_version"] == 1
+        assert body["protocol_version"] == 2
+        assert body["experiment"] == {"variant": "baseline", "candidate": None}
         assert body["scenario"]["id"] == scenario_id
         return httpx.Response(
             200,
             json={
-                "protocol_version": 1,
+                "protocol_version": 2,
                 "status": "completed",
                 "transcript": "The basic plan costs $20 per month.",
                 "latency_ms": 510,
                 "tools_called": ["get_pricing"],
                 "provider": "mocked-live-agent",
                 "model": "voice-agent-v1",
+                "agent_version": "agent-base-v1",
+                "variant": "baseline",
+                "candidate_id": None,
             },
         )
 
     monkeypatch.setattr(
         main_module,
         "build_configured_http_adapter",
-        lambda: HTTPJSONAgentAdapter(
+        lambda candidate=None: HTTPJSONAgentAdapter(
             endpoint="https://bridge.example.test/evaluate",
             api_key="test-secret",
+            variant=RunVariant.CANDIDATE if candidate else RunVariant.BASELINE,
+            candidate=candidate,
             transport=httpx.MockTransport(handler),
         ),
     )
@@ -118,6 +125,8 @@ def test_agent_run_persists_live_evidence_and_replays_idempotently(
     run = first.json()
     assert run["status"] == "passed"
     assert run["evidence_mode"] == "live"
+    assert run["variant"] == "baseline"
+    assert run["agent_version"] == "agent-base-v1"
     assert run["adapter_name"] == "http-json-bridge"
     assert run["observations"][0]["evidence_mode"] == "live"
     assert run["observations"][0]["provider"] == "mocked-live-agent"
@@ -153,6 +162,8 @@ def test_invalid_bridge_response_is_saved_as_inconclusive_not_passed(
         "build_configured_http_adapter",
         lambda: HTTPJSONAgentAdapter(
             endpoint="https://bridge.example.test/evaluate",
+            variant=RunVariant.CANDIDATE if candidate else RunVariant.BASELINE,
+            candidate=candidate,
             transport=httpx.MockTransport(
                 lambda request: httpx.Response(
                     200,
@@ -174,4 +185,4 @@ def test_invalid_bridge_response_is_saved_as_inconclusive_not_passed(
     run = response.json()
     assert run["status"] == "inconclusive"
     assert all(check["passed"] is None for check in run["checks"])
-    assert "did not match protocol version 1" in run["observations"][0]["error"]
+    assert "did not match protocol version 2" in run["observations"][0]["error"]
