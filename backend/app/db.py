@@ -7,7 +7,6 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pixi.db")
 _engine_kwargs: dict[str, object] = {"pool_pre_ping": True}
 if DATABASE_URL.startswith("sqlite"):
