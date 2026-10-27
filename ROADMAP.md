@@ -37,8 +37,10 @@ Milestones are complete only when code and reproducible evidence support them.
 
 - [x] Define a provider-neutral async adapter contract.
 - [x] Implement a fixture adapter for deterministic CI; it always emits simulated evidence.
-- [ ] Choose the first real voice-agent runtime from the agent stack to be evaluated.
-- [ ] Implement a server-side adapter for a real external runtime.
+- [x] Add a configurable HTTP JSON bridge adapter and live-run API route with strict response schema, bounded timeouts, and HTTPS requirement outside local development.
+- [x] Document the provider-neutral bridge request/response contract.
+- [ ] Choose the first real voice-agent runtime from the agent stack to be evaluated and verify a bridge against it.
+- [ ] Add runtime-specific support for audio turns, interruptions/barge-in, VAD/endpointing, and detailed tool traces.
 - [ ] Add realistic voice events such as barge-in, silence, endpointing, tool events, and latency.
 - [ ] Add bounded, opt-in live tests with strict spend/time limits and clear evidence provenance.
 
