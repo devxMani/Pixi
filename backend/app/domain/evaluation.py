@@ -1,9 +1,9 @@
 """Pure evaluation decision policy; errors and missing evidence never pass."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Iterable
 
 
 class Outcome(StrEnum):
