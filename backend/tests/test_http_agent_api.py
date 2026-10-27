@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+import json
 
 import httpx
 import pytest
@@ -80,7 +81,7 @@ def test_agent_run_persists_live_evidence_and_replays_idempotently(
         nonlocal calls
         calls += 1
         assert request.headers["authorization"] == "Bearer test-secret"
-        body = request.json()
+        body = json.loads(request.content)
         assert body["protocol_version"] == 1
         assert body["scenario"]["id"] == scenario_id
         return httpx.Response(
