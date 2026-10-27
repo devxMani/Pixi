@@ -4,7 +4,7 @@
 
 Pixi is an early-stage project exploring a closed-loop testing and reliability workflow for voice agents: scenario execution, evidence-backed failure analysis, small reversible candidate changes, and conservative regression-gated decisions.
 
-> Status: early prototype plus the first API-backed local workspace. The Miso UI is preserved at the root page. The Reliability Workspace supports projects, scenarios, simulated fixture runs, saved observations, assertion results, run history, candidate evaluations, human review, and versioned JSON project exports. Fixture runs are explicitly simulated; Pixi still does not connect to a real voice agent.
+> Status: early prototype plus the first API-backed local workspace. The Miso UI is preserved at the root page. The Reliability Workspace supports projects, scenarios, simulated fixture runs, saved observations, assertion results, run history, candidate evaluations, human review, versioned JSON project exports, and a configurable HTTP bridge. Pixi provides a bridge contract, but no specific vendor/runtime is verified until an operator configures and validates its adapter.
 
 ## Product direction
 
@@ -37,7 +37,8 @@ Tests: run `pytest` from `backend`. Lint: run `ruff check app tests` from `backe
 - `GET /api/v1/projects/{project_id}/export` returns a versioned JSON snapshot of a project's scenarios, runs, observations, checks, candidates, evaluations, and review history.
 - Supplying an `Idempotency-Key` header on a demo-run request makes retries return the original run; reusing the same key for different input returns HTTP 409.
 - A fixture run is clearly marked simulated. Exported data does not convert simulated evidence into live evidence.
-- A configurable server-side HTTP JSON bridge can execute a scenario against an operator-managed endpoint through `POST /api/v1/projects/{project_id}/scenarios/{scenario_id}/agent-runs`. It follows the strict versioned contract in `docs/AGENT_BRIDGE.md`; it is not a vendor-specific integration.
+- A configurable server-side HTTP JSON bridge can execute baseline and candidate-variant scenarios through `POST /api/v1/projects/{project_id}/scenarios/{scenario_id}/agent-runs` (`?candidate_id=...` selects a candidate variant). It follows the strict protocol in `docs/AGENT_BRIDGE.md`; it is not a vendor-specific integration.
+- Candidate gate evaluations can be based on persisted run IDs, immutable agent versions, a failed baseline target, a passing candidate target, and passing candidate regression runs. Critical regressions block approval; fixture evidence never satisfies the live gate.
 - The export is a backup artifact, not yet a restore/import mechanism.
 
 ## Safety and limitations
