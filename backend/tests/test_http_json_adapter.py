@@ -31,19 +31,23 @@ async def test_http_bridge_sends_scenario_and_marks_valid_external_response_live
         assert str(request.url) == "https://bridge.example.test/pixi/evaluate"
         assert request.headers["authorization"] == "Bearer server-only-secret"
         payload = json.loads(request.content)
-        assert payload["protocol_version"] == 1
+        assert payload["protocol_version"] == 2
+        assert payload["experiment"] == {"variant": "baseline", "candidate": None}
         assert payload["scenario"]["id"] == "pricing"
         assert payload["scenario"]["turns"] == ["How much is the basic plan?"]
         return httpx.Response(
             200,
             json={
-                "protocol_version": 1,
+                "protocol_version": 2,
                 "status": "completed",
                 "transcript": "The basic plan costs $20 per month.",
                 "latency_ms": 325,
                 "tools_called": ["get_pricing"],
                 "provider": "test-agent-runtime",
                 "model": "support-agent-v3",
+                "agent_version": "agent-base-v1",
+                "variant": "baseline",
+                "candidate_id": None,
             },
         )
 
@@ -71,7 +75,7 @@ async def test_http_bridge_rejects_protocol_mismatch_as_an_error() -> None:
             lambda request: httpx.Response(
                 200,
                 json={
-                    "protocol_version": 2,
+                    "protocol_version": 1,
                     "status": "completed",
                     "transcript": "Looks good",
                 },
@@ -79,7 +83,7 @@ async def test_http_bridge_rejects_protocol_mismatch_as_an_error() -> None:
         ),
     )
 
-    with pytest.raises(RuntimeError, match="did not match protocol version 1"):
+    with pytest.raises(RuntimeError, match="did not match protocol version 2"):
         await adapter.execute(sample_scenario())
 
 
@@ -94,6 +98,9 @@ async def test_http_bridge_rejects_extra_provenance_fields_from_remote_payload()
                     "protocol_version": 1,
                     "status": "completed",
                     "transcript": "Looks good",
+                    "agent_version": "agent-base-v1",
+                    "variant": "baseline",
+                    "candidate_id": None,
                     "evidence_mode": "live",
                 },
             )
@@ -147,6 +154,9 @@ def test_http_bridge_allows_loopback_http_only_when_explicitly_enabled() -> None
                     "protocol_version": 1,
                     "status": "completed",
                     "transcript": "done",
+                    "agent_version": "agent-base-v1",
+                    "variant": "baseline",
+                    "candidate_id": None,
                 },
             )
         ),
