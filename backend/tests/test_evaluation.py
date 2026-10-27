@@ -42,3 +42,18 @@ def test_not_applicable_is_not_a_pass():
     result = decide_evaluation(setup_valid=True, applicable=False,
         target_checks=[CheckResult("target", True)], regression_checks=[CheckResult("baseline", True)])
     assert result.outcome == Outcome.NOT_APPLICABLE
+
+
+
+def test_critical_failure_overrides_missing_evidence():
+    decision = decide_evaluation(
+        setup_valid=True,
+        applicable=True,
+        target_checks=[CheckResult("target", True)],
+        regression_checks=[
+            CheckResult("timeout", None, error="provider timeout"),
+            CheckResult("safety", False, critical=True),
+        ],
+    )
+    assert decision.outcome == Outcome.FAILED
+    assert decision.critical_regressions == ("safety",)

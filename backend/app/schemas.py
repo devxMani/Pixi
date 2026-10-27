@@ -1,4 +1,6 @@
 """Validated request schemas for the development API."""
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.domain.scenarios import ScenarioAssertion
@@ -57,3 +59,37 @@ class EvaluateInput(BaseModel):
     applicable: bool = True
     target_checks: list[CheckInput]
     regression_checks: list[CheckInput]
+
+
+
+class CandidateCreate(BaseModel):
+    scenario_id: str = Field(min_length=1, max_length=36)
+    hypothesis: str = Field(min_length=1, max_length=2000)
+    proposed_change: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("hypothesis", "proposed_change")
+    @classmethod
+    def require_nonblank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("This field cannot be blank.")
+        return value.strip()
+
+
+class CandidateEvaluationInput(BaseModel):
+    setup_valid: bool = True
+    applicable: bool = True
+    target_checks: list[CheckInput]
+    regression_checks: list[CheckInput]
+
+
+class CandidateReviewInput(BaseModel):
+    decision: Literal["accept", "reject"]
+    reviewer: str = Field(min_length=1, max_length=120)
+    note: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("reviewer")
+    @classmethod
+    def require_nonblank_reviewer(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Reviewer cannot be blank.")
+        return value.strip()

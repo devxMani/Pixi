@@ -17,8 +17,24 @@ from app.db import get_db
 from app.domain.evaluation import CheckResult, decide_evaluation
 from app.domain.scenario_runner import run_scenario
 from app.domain.scenarios import Scenario
-from app.models import CheckRecord, ObservationRecord, ProjectRecord, RunRecord, ScenarioRecord
-from app.schemas import EvaluateInput, FixtureObservationInput, ProjectCreate, ScenarioCreate
+from app.models import (
+    CandidateEvaluationRecord,
+    CandidateRecord,
+    CheckRecord,
+    ObservationRecord,
+    ProjectRecord,
+    RunRecord,
+    ScenarioRecord,
+)
+from app.schemas import (
+    CandidateCreate,
+    CandidateEvaluationInput,
+    CandidateReviewInput,
+    EvaluateInput,
+    FixtureObservationInput,
+    ProjectCreate,
+    ScenarioCreate,
+)
 
 app = FastAPI(
     title="Pixi API",
@@ -45,6 +61,44 @@ def _project_or_404(db: Session, project_id: str) -> ProjectRecord:
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found.")
     return project
+
+
+def _serialize_candidate(db: Session, candidate: CandidateRecord) -> dict[str, object]:
+    latest = db.scalars(
+        select(CandidateEvaluationRecord)
+        .where(CandidateEvaluationRecord.candidate_id == candidate.id)
+        .order_by(CandidateEvaluationRecord.created_at.desc())
+        .limit(1)
+    ).first()
+    evaluation = None
+    if latest is not None:
+        evaluation = {
+            "id": latest.id,
+            "outcome": latest.outcome,
+            "reason": latest.reason,
+            "evidence_mode": latest.evidence_mode,
+            "target_passed": latest.target_passed,
+            "regression_count": latest.regression_count,
+            "failed_regressions": latest.failed_regressions,
+            "critical_regressions": latest.critical_regressions,
+            "checks_snapshot": latest.checks_snapshot,
+            "review_decision": latest.review_decision,
+            "reviewer": latest.reviewer,
+            "review_note": latest.review_note,
+            "reviewed_at": latest.reviewed_at,
+            "created_at": latest.created_at,
+        }
+    return {
+        "id": candidate.id,
+        "project_id": candidate.project_id,
+        "scenario_id": candidate.scenario_id,
+        "hypothesis": candidate.hypothesis,
+        "proposed_change": candidate.proposed_change,
+        "status": candidate.status,
+        "production_applied": candidate.production_applied,
+        "created_at": candidate.created_at,
+        "latest_evaluation": evaluation,
+    }
 
 
 def _serialize_run(db: Session, run: RunRecord) -> dict[str, object]:
@@ -283,6 +337,138 @@ def get_run(
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found.")
     return _serialize_run(db, run)
+
+
+@router.post("/projects/{project_id}/candidates", status_code=201)
+def create_candidate(
+    project_id: str,
+    payload: CandidateCreate,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    _project_or_404(db, project_id)
+    scenario = db.get(ScenarioRecord, payload.scenario_id)
+    if scenario is None or scenario.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Scenario not found in this project.")
+    candidate = CandidateRecord(
+        id=str(uuid4()),
+        project_id=project_id,
+        scenario_id=payload.scenario_id,
+        hypothesis=payload.hypothesis,
+        proposed_change=payload.proposed_change,
+        status="proposed",
+        production_applied=False,
+    )
+    db.add(candidate)
+    db.commit()
+    db.refresh(candidate)
+    return _serialize_candidate(db, candidate)
+
+
+@router.get("/projects/{project_id}/candidates")
+def list_candidates(
+    project_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[dict[str, object]]:
+    _project_or_404(db, project_id)
+    candidates = db.scalars(
+        select(CandidateRecord)
+        .where(CandidateRecord.project_id == project_id)
+        .order_by(CandidateRecord.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [_serialize_candidate(db, candidate) for candidate in candidates]
+
+
+@router.post("/candidates/{candidate_id}/evaluate", status_code=201)
+def evaluate_candidate(
+    candidate_id: str,
+    payload: CandidateEvaluationInput,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    candidate = db.get(CandidateRecord, candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+    targets = tuple(CheckResult(**item.model_dump()) for item in payload.target_checks)
+    regressions = tuple(CheckResult(**item.model_dump()) for item in payload.regression_checks)
+    decision = decide_evaluation(
+        setup_valid=payload.setup_valid,
+        applicable=payload.applicable,
+        target_checks=targets,
+        regression_checks=regressions,
+    )
+    checks = {
+        "target": [
+            {"name": item.name, "passed": item.passed, "critical": item.critical, "error": item.error}
+            for item in targets
+        ],
+        "regressions": [
+            {"name": item.name, "passed": item.passed, "critical": item.critical, "error": item.error}
+            for item in regressions
+        ],
+        "setup_valid": payload.setup_valid,
+        "applicable": payload.applicable,
+    }
+    db.add(
+        CandidateEvaluationRecord(
+            id=str(uuid4()),
+            candidate_id=candidate.id,
+            outcome=decision.outcome.value,
+            reason=decision.reason,
+            evidence_mode="simulated",
+            target_passed=decision.target_passed,
+            regression_count=decision.regression_count,
+            failed_regressions=list(decision.failed_regressions),
+            critical_regressions=list(decision.critical_regressions),
+            checks_snapshot=checks,
+        )
+    )
+    if decision.outcome.value == "passed":
+        candidate.status = "validated_for_review"
+    elif decision.outcome.value == "failed":
+        candidate.status = "gate_failed"
+    else:
+        candidate.status = decision.outcome.value
+    db.commit()
+    db.refresh(candidate)
+    return _serialize_candidate(db, candidate)
+
+
+@router.post("/candidates/{candidate_id}/review")
+def review_candidate(
+    candidate_id: str,
+    payload: CandidateReviewInput,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    candidate = db.get(CandidateRecord, candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found.")
+    latest = db.scalars(
+        select(CandidateEvaluationRecord)
+        .where(CandidateEvaluationRecord.candidate_id == candidate.id)
+        .order_by(CandidateEvaluationRecord.created_at.desc())
+        .limit(1)
+    ).first()
+    if latest is None:
+        raise HTTPException(status_code=409, detail="Evaluate the candidate before review.")
+    if payload.decision == "accept":
+        if latest.outcome != "passed":
+            raise HTTPException(status_code=409, detail="Candidate must pass evaluation before approval.")
+        if latest.evidence_mode != "live":
+            raise HTTPException(
+                status_code=409,
+                detail="Simulated evidence cannot be approved for release. A passing live-agent evaluation is required.",
+            )
+        candidate.status = "accepted"
+    else:
+        candidate.status = "rejected"
+    latest.review_decision = payload.decision
+    latest.reviewer = payload.reviewer
+    latest.review_note = payload.note
+    latest.reviewed_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(candidate)
+    return _serialize_candidate(db, candidate)
 
 
 @router.post("/evaluations/decide")

@@ -123,3 +123,78 @@ def test_browser_entrypoints_are_served_by_the_api(client: TestClient):
     assert "Talk to Miso" in prototype.text
     assert console.status_code == 200
     assert "Reliability Workspace" in console.text
+
+
+
+def create_candidate(client: TestClient, project_id: str, scenario_id: str) -> str:
+    response = client.post(
+        f"/api/v1/projects/{project_id}/candidates",
+        json={
+            "scenario_id": scenario_id,
+            "hypothesis": "Shorter confirmations reduce waiting without reducing accuracy.",
+            "proposed_change": "Use a one-sentence confirmation for the common path.",
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["production_applied"] is False
+    return response.json()["id"]
+
+
+def test_simulated_candidate_cannot_be_approved_for_release(client: TestClient):
+    project_id, scenario_id = create_project_and_scenario(client)
+    candidate_id = create_candidate(client, project_id, scenario_id)
+    evaluation = client.post(
+        f"/api/v1/candidates/{candidate_id}/evaluate",
+        json={
+            "target_checks": [{"name": "target", "passed": True}],
+            "regression_checks": [{"name": "baseline", "passed": True}],
+        },
+    )
+    assert evaluation.status_code == 201
+    assert evaluation.json()["latest_evaluation"]["outcome"] == "passed"
+    assert evaluation.json()["latest_evaluation"]["evidence_mode"] == "simulated"
+    approval = client.post(
+        f"/api/v1/candidates/{candidate_id}/review",
+        json={"decision": "accept", "reviewer": "Reviewer"},
+    )
+    assert approval.status_code == 409
+    assert "Simulated evidence" in approval.json()["detail"]
+    rejected = client.post(
+        f"/api/v1/candidates/{candidate_id}/review",
+        json={"decision": "reject", "reviewer": "Reviewer"},
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "rejected"
+    assert rejected.json()["production_applied"] is False
+
+
+def test_critical_failure_blocks_candidate_even_with_missing_evidence(client: TestClient):
+    project_id, scenario_id = create_project_and_scenario(client)
+    candidate_id = create_candidate(client, project_id, scenario_id)
+    evaluation = client.post(
+        f"/api/v1/candidates/{candidate_id}/evaluate",
+        json={
+            "target_checks": [{"name": "target", "passed": True}],
+            "regression_checks": [
+                {"name": "missing", "passed": None, "error": "timeout"},
+                {"name": "safety", "passed": False, "critical": True},
+            ],
+        },
+    )
+    assert evaluation.status_code == 201
+    assert evaluation.json()["latest_evaluation"]["outcome"] == "failed"
+    assert evaluation.json()["latest_evaluation"]["critical_regressions"] == ["safety"]
+
+
+def test_empty_candidate_regression_suite_is_inconclusive(client: TestClient):
+    project_id, scenario_id = create_project_and_scenario(client)
+    candidate_id = create_candidate(client, project_id, scenario_id)
+    evaluation = client.post(
+        f"/api/v1/candidates/{candidate_id}/evaluate",
+        json={
+            "target_checks": [{"name": "target", "passed": True}],
+            "regression_checks": [],
+        },
+    )
+    assert evaluation.status_code == 201
+    assert evaluation.json()["latest_evaluation"]["outcome"] == "inconclusive"

@@ -110,3 +110,56 @@ class CheckRecord(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     run: Mapped[RunRecord] = relationship(back_populates="checks")
+
+
+
+class CandidateRecord(Base):
+    __tablename__ = "candidates"
+    __table_args__ = (Index("ix_candidates_project_created", "project_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    scenario_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("scenarios.id", ondelete="RESTRICT"), nullable=False
+    )
+    hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
+    proposed_change: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="proposed")
+    production_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    evaluations: Mapped[list[CandidateEvaluationRecord]] = relationship(
+        back_populates="candidate", cascade="all, delete-orphan"
+    )
+
+
+class CandidateEvaluationRecord(Base):
+    __tablename__ = "candidate_evaluations"
+    __table_args__ = (
+        Index("ix_candidate_evaluations_candidate_created", "candidate_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    candidate_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False
+    )
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    regression_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    failed_regressions: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    critical_regressions: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    checks_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    review_decision: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    reviewer: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+    candidate: Mapped[CandidateRecord] = relationship(back_populates="evaluations")
