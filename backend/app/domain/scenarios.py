@@ -30,15 +30,19 @@ class ScenarioAssertion(BaseModel):
     tool_name: str | None = None
 
     @model_validator(mode="after")
-    def validate_required_argument(self) -> "ScenarioAssertion":
-        if self.kind in (AssertionKind.CONTAINS, AssertionKind.NOT_CONTAINS):
-            if not self.expected_text or not self.expected_text.strip():
-                raise ValueError("expected_text is required for text assertions")
+    def validate_required_argument(self) -> ScenarioAssertion:
+        if (
+            self.kind in (AssertionKind.CONTAINS, AssertionKind.NOT_CONTAINS)
+            and (not self.expected_text or not self.expected_text.strip())
+        ):
+            raise ValueError("expected_text is required for text assertions")
         if self.kind == AssertionKind.MAX_LATENCY_MS and self.threshold_ms is None:
             raise ValueError("threshold_ms is required for latency assertions")
-        if self.kind in (AssertionKind.TOOL_CALLED, AssertionKind.TOOL_NOT_CALLED):
-            if not self.tool_name or not self.tool_name.strip():
-                raise ValueError("tool_name is required for tool assertions")
+        if (
+            self.kind in (AssertionKind.TOOL_CALLED, AssertionKind.TOOL_NOT_CALLED)
+            and (not self.tool_name or not self.tool_name.strip())
+        ):
+            raise ValueError("tool_name is required for tool assertions")
         return self
 
 
