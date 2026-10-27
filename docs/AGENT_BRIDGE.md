@@ -84,9 +84,11 @@ A configured bridge is a trust boundary; a response field alone cannot prove tha
 The live candidate gate is `POST /api/v1/candidates/{candidate_id}/evaluate-runs`. It requires:
 1. A recorded live **baseline** run for the candidate's target scenario that failed.
 2. A recorded live **candidate** run for that same target scenario that belongs to this candidate.
-3. At least one live candidate-variant regression run from a different scenario.
-4. The same candidate ID and agent version across the candidate target and all regression runs, and a version different from the baseline.
+3. A live candidate-variant regression run for **every other saved scenario in the project**. Until Pixi has named/tagged regression suites, all non-target project scenarios form the required suite.
+4. The same candidate ID and agent version across the candidate target and every regression run, and a candidate version different from the baseline.
 5. Passing target and regression checks. Any critical regression blocks approval.
+
+The endpoint rejects a partial regression suite, duplicate scenario coverage, cross-project evidence, fixture runs, mismatched candidate IDs, missing version metadata, and mixed candidate versions. A new scenario added to the project must be evaluated against the candidate before the gate can pass. This is conservative by design; named or tagged regression suites are a future improvement.
 
 The gate reads persisted run checks, not caller-submitted booleans. It records the referenced run IDs and check snapshots. Human review is still required; Pixi does not deploy or mutate the agent. Simulated runs cannot satisfy the live gate.
 
