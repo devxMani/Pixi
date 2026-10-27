@@ -37,6 +37,7 @@ Tests: run `pytest` from `backend`. Lint: run `ruff check app tests` from `backe
 - `GET /api/v1/projects/{project_id}/export` returns a versioned JSON snapshot of a project's scenarios, runs, observations, checks, candidates, evaluations, and review history.
 - Supplying an `Idempotency-Key` header on a demo-run request makes retries return the original run; reusing the same key for different input returns HTTP 409.
 - A fixture run is clearly marked simulated. Exported data does not convert simulated evidence into live evidence.
+- A configurable server-side HTTP JSON bridge can execute a scenario against an operator-managed endpoint through `POST /api/v1/projects/{project_id}/scenarios/{scenario_id}/agent-runs`. It follows the strict versioned contract in `docs/AGENT_BRIDGE.md`; it is not a vendor-specific integration.
 - The export is a backup artifact, not yet a restore/import mechanism.
 
 ## Safety and limitations
@@ -45,11 +46,11 @@ The API defaults to disabled unless `APP_ENV=development`. This is intentionally
 
 ## Near-term build plan
 
-1. Choose the first real voice-agent runtime to evaluate.
-2. Implement a server-side adapter with evidence provenance and bounded live tests.
-3. Add agent-version history, a restore/import path, regression gates, and human approval.
-4. Add authentication/project isolation and data handling controls.
-5. Connect real-agent history and evidence to the workspace.
+1. Configure or build a trusted bridge for the first real voice-agent runtime; follow `docs/AGENT_BRIDGE.md`.
+2. Add provider/runtime-specific support for real audio, interruption, VAD/endpointing, and tool trace events.
+3. Add agent-version history and restore/import, then bind candidate checks to recorded live runs.
+4. Add authentication/project isolation and data handling controls before any shared deployment.
+5. Expose live-run and provenance controls in the workspace, then validate them against an actual agent.
 
 ## License
 
