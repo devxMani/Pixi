@@ -336,7 +336,7 @@ def test_candidate_gate_requires_every_project_regression_scenario(
         },
     )
     assert extra.status_code == 201
-    extra_regression_id = extra.json()["id"]
+    assert extra.json()["id"]
     install_bridge(monkeypatch, target_scenario_id=target_id)
 
     baseline = run_live(client, project_id, target_id, key="baseline-complete-suite")
