@@ -294,7 +294,7 @@ class ProjectImportInput(BaseModel):
                     raise ValueError("Evaluation target snapshot references a different candidate.")
                 regressions = snapshot.get("regressions")
                 if not isinstance(regressions, list) or not regressions:
-                    raise ValueError("An evidence evaluation must include at least one regression run.")  # noqa: TRY004 - Pydantic requires ValueError for a validation response
+                    raise ValueError("An evidence evaluation must include at least one regression run.")
                 for regression in regressions:
                     if not isinstance(regression, dict):
                         raise ValueError("Regression evidence entries must be objects.")  # noqa: TRY004 - Pydantic requires ValueError for a validation response
