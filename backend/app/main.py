@@ -1057,16 +1057,19 @@ def import_project_backup(
         db.add(project)
         db.flush()
 
-        scenario_records = [
-            ScenarioRecord(
-                id=scenario_id_map[item.id],
-                project_id=project_id,
-                name=item.name,
-                definition=item.definition.model_dump(mode="json"),
-                created_at=item.created_at,
+        scenario_records = []
+        for item in payload.scenarios:
+            definition = item.definition.model_dump(mode="json")
+            definition["id"] = scenario_id_map[item.id]
+            scenario_records.append(
+                ScenarioRecord(
+                    id=scenario_id_map[item.id],
+                    project_id=project_id,
+                    name=item.name,
+                    definition=definition,
+                    created_at=item.created_at,
+                )
             )
-            for item in payload.scenarios
-        ]
         db.add_all(scenario_records)
         db.flush()
 
