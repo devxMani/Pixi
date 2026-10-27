@@ -50,10 +50,11 @@ Milestones are complete only when code and reproducible evidence support them.
 ## Phase 4 — Product workflow
 
 - [x] Create a local API-backed UI for projects, scenarios, fixture runs, checks, and saved history.
-- [ ] Connect real-agent run history to the workspace.
-- [ ] Make live-vs-simulated evidence provenance visually unambiguous in every view.
+- [x] Connect saved live-agent run history to the workspace, showing evidence mode, variant, and agent version.
+- [x] Make live-vs-simulated provenance visible in run history and evidence details.
 - [x] Implement candidate hypotheses/changes, gate evaluation snapshots, and human-review records; release approval remains locked for simulated evidence.
 - [x] Gate a candidate using persisted baseline, candidate-target, and same-version candidate regression runs; fixture/manual checks cannot satisfy the live-evidence gate.
+- [x] Add one-click candidate suite execution across all saved project scenarios, using per-scenario idempotency keys so partial retries do not create duplicate runs.
 - [ ] Demonstrate one reproducible accepted improvement and one reproducible rejected critical regression against an actual configured staging agent.
 
 ## Phase 5 — Product hardening

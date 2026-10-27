@@ -40,6 +40,7 @@ Tests: run `pytest` from `backend`. Lint: run `ruff check app tests` from `backe
 - A fixture run is clearly marked simulated. Exported data does not convert simulated evidence into live evidence.
 - A configurable server-side HTTP JSON bridge can execute baseline and candidate-variant scenarios through `POST /api/v1/projects/{project_id}/scenarios/{scenario_id}/agent-runs` (`?candidate_id=...` selects a candidate variant). It follows the strict protocol in `docs/AGENT_BRIDGE.md`; it is not a vendor-specific integration.
 - Candidate gate evaluations use persisted run IDs and immutable agent versions. They require a failed baseline target, a passing candidate target, and passing candidate runs for every non-target scenario in the project. Critical regressions block approval; partial suites, mixed candidate versions, and fixture evidence cannot satisfy the live gate.
+- The workspace can run the selected candidate across every saved project scenario in one action. Per-scenario idempotency keys make retries safe if the bridge or UI fails partway through; each run remains inspectable in history before evaluation.
 - Restore preserves historical evidence and review decisions but does not re-run agents or apply candidates. Older exports without immutable agent versions remain ineligible for the versioned live-candidate gate.
 
 ## Safety and limitations
@@ -48,11 +49,11 @@ The API defaults to disabled unless `APP_ENV=development`. This is intentionally
 
 ## Near-term build plan
 
-1. Configure or build a trusted bridge for the first real voice-agent runtime; follow `docs/AGENT_BRIDGE.md`.
-2. Add provider/runtime-specific support for real audio, interruption, VAD/endpointing, and tool trace events.
-3. Add agent-version history and restore/import, then bind candidate checks to recorded live runs.
-4. Add authentication/project isolation and data handling controls before any shared deployment.
-5. Expose live-run and provenance controls in the workspace, then validate them against an actual agent.
+1. Configure and verify the bridge against the actual voice-agent runtime; follow `docs/AGENT_BRIDGE.md`.
+2. Add provider/runtime-specific support for real audio, interruption/barge-in, VAD/endpointing, and detailed tool traces.
+3. Demonstrate a reproducible accepted improvement and rejected critical regression on a staged real agent.
+4. Add authentication/project isolation, data redaction/retention, and budget/rate limits before any shared deployment.
+5. Add named/tagged regression suites rather than treating every saved project scenario as the required suite.
 
 ## License
 
