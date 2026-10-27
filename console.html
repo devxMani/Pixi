@@ -81,6 +81,11 @@
           </fieldset>
         </form>
       </section>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Run against a configured agent</h2><p class="subcopy">Send the selected scenario to the server-side HTTP bridge.</p></div><span class="pill">LIVE BRIDGE</span></div>
+        <p class="subcopy">This calls your configured agent endpoint, not the fixture simulator. Set <code>PIXI_AGENT_ENDPOINT</code> on the backend and follow <a href="https://github.com/devxMani/Pixi/blob/main/docs/AGENT_BRIDGE.md" target="_blank" rel="noreferrer">the bridge contract</a>. Provider setup is server-side; credentials are never entered here.</p>
+        <button class="btn full" id="live-run-button" type="button" disabled>↗ Run scenario against configured agent</button>
+      </section>
     </div>
   </div>
   <section id="run-history" class="panel history">
@@ -129,6 +134,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const state = { projects: [], scenarios: [], runs: [], candidates: [], projectId: "", scenarioId: "", runId: "", candidateId: "" };
+let pendingLiveRunAttempt = null;
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -195,6 +201,7 @@ function renderScenarios() {
   if (!state.projectId) {
     list.append(node("div", "empty", "Create a project to save your first scenario."));
     $("run-fields").disabled = true;
+    $("live-run-button").disabled = true;
     return;
   }
   if (!state.scenarios.length) {
@@ -214,6 +221,7 @@ function renderScenarios() {
     list.append(button);
   });
   $("run-fields").disabled = !state.scenarioId;
+  $("live-run-button").disabled = !state.scenarioId;
 }
 function renderSelectedScenario() {
   const box = $("selected-scenario");
@@ -223,6 +231,7 @@ function renderSelectedScenario() {
     box.append(node("strong", "", "No scenario selected"));
     box.append(node("p", "", "Select an existing case or create one to enable a demo run."));
     $("run-fields").disabled = true;
+    $("live-run-button").disabled = true;
     return;
   }
   const def = selected.definition || {};
@@ -231,6 +240,7 @@ function renderSelectedScenario() {
   box.append(node("p", "", (def.turns || []).join("\n")));
   box.append(node("p", "", (def.assertions || []).length + " assertion(s) configured. Fixture runs below use the saved assertions."));
   $("run-fields").disabled = false;
+  $("live-run-button").disabled = false;
 }
 function renderRunDetail(run) {
   const box = $("run-detail");
@@ -449,6 +459,38 @@ $("run-form").addEventListener("submit", async (event) => {
     notice("Fixture evaluated and evidence saved. This is a simulated result, not a live agent test.", false);
   } catch (error) { notice(error.message, true); }
   finally { submit.disabled = false; submit.textContent = "▶ Evaluate fixture and save evidence"; }
+});
+$("live-run-button").addEventListener("click", async () => {
+  clearNotice();
+  if (!state.projectId || !state.scenarioId) {
+    notice("Create or select a scenario first.", true);
+    return;
+  }
+  const scope = state.projectId + ":" + state.scenarioId;
+  if (!pendingLiveRunAttempt || pendingLiveRunAttempt.scope !== scope) {
+    const key = (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function")
+      ? globalThis.crypto.randomUUID()
+      : (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2));
+    pendingLiveRunAttempt = {scope, key};
+  }
+  const button = $("live-run-button");
+  button.disabled = true;
+  button.textContent = "Calling configured agent…";
+  try {
+    const run = await api(
+      "/api/v1/projects/" + encodeURIComponent(state.projectId) +
+      "/scenarios/" + encodeURIComponent(state.scenarioId) + "/agent-runs",
+      {method:"POST", headers:{"Idempotency-Key":pendingLiveRunAttempt.key}}
+    );
+    pendingLiveRunAttempt = null;
+    await loadProjectData(run.id);
+    notice("Agent bridge run saved: " + run.status + " (" + run.evidence_mode + "). Inspect its evidence before using the result for a release decision.", run.status !== "passed");
+  } catch (error) {
+    notice(error.message + " Check server-side PIXI_AGENT_ENDPOINT and docs/AGENT_BRIDGE.md. Retry uses the same attempt key.", true);
+  } finally {
+    button.disabled = !state.scenarioId;
+    button.textContent = "↗ Run scenario against configured agent";
+  }
 });
 function renderCandidates() {
   const list = $("candidate-list");
