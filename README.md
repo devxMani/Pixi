@@ -13,9 +13,11 @@ See [Product specification](docs/PRODUCT_SPEC.md), [Architecture](docs/ARCHITECT
 
 ## Current repository
 - `index.html` — preserved exported browser prototype.
-- `backend/app/domain/evaluation.py` — pure conservative evaluation policy.
-- `backend/app/main.py` — minimal FastAPI health and decision endpoints.
-- `backend/tests/` — policy and API tests.
+- `backend/app/domain/evaluation.py` — pure conservative experiment decision policy.
+- `backend/app/domain/scenarios.py` and `scenario_runner.py` — validated scenario/assertion contracts and conservative scenario result classification.
+- `backend/app/adapters/` — provider-neutral adapter protocol plus a fixture adapter explicitly labeled simulated.
+- `backend/app/main.py` — minimal FastAPI health and experiment-decision endpoints.
+- `backend/tests/` — policy, scenario, and API tests.
 - `.github/workflows/backend-ci.yml` — backend tests and linting on pushes/PRs.
 - `docs/` — product and engineering decisions.
 
@@ -38,7 +40,7 @@ uvicorn app.main:app --reload
 - Tests: `cd backend && pytest`
 - Lint: `cd backend && ruff check app tests`
 
-The decision API evaluates supplied checks; it does not yet run an agent, manage experiments, or write to a database.
+The decision API evaluates supplied checks. The domain layer now defines a provider-neutral scenario execution contract and a deterministic fixture adapter, but there is no real voice-agent adapter, run persistence, or experiment management yet.
 
 ## Evaluation safety contract
 Pixi distinguishes `passed`, `failed`, `inconclusive`, `invalid_setup`, and `not_applicable`. A missing observation, provider error, incomplete regression suite, empty regression suite, or invalid precondition cannot be counted as a pass. Critical safety regressions block acceptance.
