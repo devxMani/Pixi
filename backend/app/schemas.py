@@ -82,6 +82,19 @@ class CandidateEvaluationInput(BaseModel):
     regression_checks: list[CheckInput]
 
 
+class CandidateRunEvaluationInput(BaseModel):
+    baseline_run_id: str = Field(min_length=1, max_length=36)
+    candidate_target_run_id: str = Field(min_length=1, max_length=36)
+    regression_run_ids: list[str] = Field(min_length=1, max_length=100)
+
+    @field_validator("regression_run_ids")
+    @classmethod
+    def require_unique_regression_runs(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("Regression run IDs must be unique.")
+        return values
+
+
 class CandidateReviewInput(BaseModel):
     decision: Literal["accept", "reject"]
     reviewer: str = Field(min_length=1, max_length=120)
