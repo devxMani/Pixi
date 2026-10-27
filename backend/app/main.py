@@ -792,6 +792,12 @@ def evaluate_candidate_from_runs(
         target_checks=target_checks,
         regression_checks=regression_checks,
     )
+    decision_reason = (
+        "Candidate target and regression runs must use one candidate agent version "
+        "that differs from the baseline version."
+        if versions_disagree
+        else decision.reason
+    )
     checks_snapshot = {
         "source": "persisted_run_evidence",
         "baseline": {
@@ -832,7 +838,7 @@ def evaluate_candidate_from_runs(
             id=str(uuid4()),
             candidate_id=candidate.id,
             outcome=decision.outcome.value,
-            reason=decision.reason,
+            reason=decision_reason,
             evidence_mode="live",
             target_passed=decision.target_passed,
             regression_count=decision.regression_count,
