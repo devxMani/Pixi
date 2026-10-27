@@ -130,7 +130,7 @@
             <p class="subcopy">Select a failed baseline target, a passing candidate target, and at least one candidate-variant regression run. Candidate runs must share the same immutable agent version.</p>
             <div class="field"><label for="candidate-baseline-run">Baseline target run</label><select id="candidate-baseline-run" required><option value="">No live baseline run available</option></select></div>
             <div class="field"><label for="candidate-target-run">Candidate target run</label><select id="candidate-target-run" required><option value="">No candidate target run available</option></select></div>
-            <div class="field"><label for="candidate-regression-runs">Candidate regression runs (select one or more)</label><select id="candidate-regression-runs" multiple size="5" required><option value="">No candidate regression runs available</option></select><span class="hint">Use Ctrl/Command to select multiple saved regression runs.</span></div>
+            <div class="field"><label for="candidate-regression-runs">Candidate regression runs (every non-target scenario is required)</label><select id="candidate-regression-runs" multiple size="5" required><option value="">No candidate regression runs available</option></select><span id="candidate-regression-help" class="hint">Select a candidate to see required regression coverage.</span></div>
             <button class="btn full" id="candidate-run-evaluate-button" type="submit" disabled>Evaluate saved live evidence</button>
           </fieldset>
         </form>
@@ -560,7 +560,8 @@ function formatRunOption(run) {
 }
 function fillRunSelect(selectId, runs, emptyText, multiple, preferredValues) {
   const select = $(selectId);
-  const preferred = preferredValues || Array.from(select.selectedOptions || []).map((option) => option.value);
+  const previous = preferredValues || Array.from(select.selectedOptions || []).map((option) => option.value);
+  const preferred = previous.filter((id) => runs.some((run) => run.id === id));
   select.replaceChildren();
   if (!runs.length) {
     const empty = node("option", "", emptyText);
@@ -616,13 +617,40 @@ function updateCandidateRunEvaluationButton() {
   const selectedRegressionIds = Array.from($("candidate-regression-runs").selectedOptions || [])
     .map((option) => option.value)
     .filter(Boolean);
+  const candidate = state.candidates.find((item) => item.id === state.candidateId);
+  const required = candidate
+    ? state.scenarios.filter((scenario) => scenario.id !== candidate.scenario_id)
+    : [];
+  const selectedRegressionRuns = state.runs.filter((run) =>
+    selectedRegressionIds.includes(run.id)
+  );
+  const coveredScenarioIds = new Set(selectedRegressionRuns.map((run) => run.scenario_id));
+  const missing = required.filter((scenario) => !coveredScenarioIds.has(scenario.id));
+  const duplicateScenarioSelection = coveredScenarioIds.size !== selectedRegressionIds.length;
+  const hasCompleteRegressionSet = required.length > 0 && missing.length === 0 &&
+    !duplicateScenarioSelection && selectedRegressionIds.length === required.length;
   const ready = Boolean(
-    state.candidateId &&
+    candidate &&
     $("candidate-baseline-run").value &&
     $("candidate-target-run").value &&
-    selectedRegressionIds.length > 0
+    hasCompleteRegressionSet
   );
   $("candidate-run-evaluate-button").disabled = !ready;
+  const help = $("candidate-regression-help");
+  if (!candidate) {
+    help.textContent = "Select a candidate to see required regression coverage.";
+  } else if (required.length === 0) {
+    help.textContent = "Add at least one non-target scenario to this project before evaluating this candidate.";
+  } else if (missing.length > 0) {
+    help.textContent = "Missing " + missing.length + " required scenario(s): " +
+      missing.map((scenario) => scenario.name).join(", ") +
+      ". Run the selected candidate against every non-target scenario.";
+  } else if (duplicateScenarioSelection) {
+    help.textContent = "Select exactly one candidate run per non-target scenario.";
+  } else {
+    help.textContent = "Complete: all " + required.length +
+      " non-target scenario(s) have a selected candidate run. The backend will verify versions and assertions.";
+  }
 }
 $("candidate-baseline-run").addEventListener("change", updateCandidateRunEvaluationButton);
 $("candidate-target-run").addEventListener("change", updateCandidateRunEvaluationButton);

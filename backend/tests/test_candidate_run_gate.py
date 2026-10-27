@@ -315,3 +315,39 @@ def test_identical_baseline_and_candidate_version_cannot_validate_a_change(
     result = response.json()
     assert result["latest_evaluation"]["outcome"] == "invalid_setup"
     assert result["status"] == "invalid_setup"
+
+
+def test_candidate_gate_requires_every_project_regression_scenario(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_id, target_id, regression_id, candidate_id = create_project_scenarios_and_candidate(client)
+    extra = client.post(
+        f"/api/v1/projects/{project_id}/scenarios",
+        json={
+            "name": "Greeting regression",
+            "turns": ["Can you help me?"],
+            "assertions": [
+                {
+                    "id": "offers-help",
+                    "kind": "contains",
+                    "expected_text": "help",
+                }
+            ],
+        },
+    )
+    assert extra.status_code == 201
+    assert extra.json()["id"]
+    install_bridge(monkeypatch, target_scenario_id=target_id)
+
+    baseline = run_live(client, project_id, target_id, key="baseline-complete-suite")
+    target = run_live(
+        client, project_id, target_id, candidate_id=candidate_id, key="candidate-target-complete-suite"
+    )
+    regression = run_live(
+        client, project_id, regression_id, candidate_id=candidate_id, key="candidate-regression-one"
+    )
+    response = evaluate_runs(client, candidate_id, baseline, target, [regression])
+
+    assert response.status_code == 409
+    assert "Regression suite is incomplete" in response.json()["detail"]
+    assert "missing 1 scenario" in response.json()["detail"]

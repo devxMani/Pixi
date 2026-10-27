@@ -720,6 +720,36 @@ def evaluate_candidate_from_runs(
             detail="Use one regression run per distinct scenario.",
         )
 
+    expected_regression_scenarios = set(
+        db.scalars(
+            select(ScenarioRecord.id).where(
+                ScenarioRecord.project_id == candidate.project_id,
+                ScenarioRecord.id != candidate.scenario_id,
+            )
+        ).all()
+    )
+    submitted_regression_scenarios = set(regression_scenarios)
+    if not expected_regression_scenarios:
+        raise HTTPException(
+            status_code=409,
+            detail="Create at least one non-target scenario before evaluating a candidate.",
+        )
+    missing_regressions = expected_regression_scenarios - submitted_regression_scenarios
+    unexpected_regressions = submitted_regression_scenarios - expected_regression_scenarios
+    if missing_regressions:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Regression suite is incomplete. Run the candidate against every non-target "
+                f"scenario in this project; missing {len(missing_regressions)} scenario(s)."
+            ),
+        )
+    if unexpected_regressions:
+        raise HTTPException(
+            status_code=422,
+            detail="Regression runs must belong to non-target scenarios in this project.",
+        )
+
     baseline_version = baseline_run.agent_version
     candidate_versions = [target_run.agent_version, *(run.agent_version for run in regression_runs)]
     has_missing_versions = not baseline_version or any(not version for version in candidate_versions)
