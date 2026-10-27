@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.domain.scenarios import AgentObservation, EvidenceMode, Scenario
+from app.domain.scenarios import AgentObservation, EvidenceMode, RunVariant, Scenario
 
 
 class AgentAdapter(Protocol):
@@ -15,6 +15,8 @@ class AgentAdapter(Protocol):
 
     name: str
     evidence_mode: EvidenceMode
+    variant: RunVariant
+    candidate_id: str | None
 
     async def execute(self, scenario: Scenario) -> AgentObservation:
         """Execute the scenario and return transcript, metrics, tool events, or an error."""
