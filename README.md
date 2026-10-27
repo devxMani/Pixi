@@ -9,7 +9,7 @@ Pixi is an early-stage project exploring a closed-loop testing and reliability w
 ## Product direction
 The MVP is for engineers building voice agents who need to investigate interruptions, tool failures, latency, response quality, and safety regressions. The core promise is: **know what broke, reproduce it, and prove a fix does not regress the agent.**
 
-See [Product specification](docs/PRODUCT_SPEC.md), [Architecture](docs/ARCHITECTURE.md), [Roadmap](ROADMAP.md), [Engineering guide](docs/ENGINEERING_GUIDE.md), and [Contributing](CONTRIBUTING.md).
+See [Product specification](docs/PRODUCT_SPEC.md), [Architecture](docs/ARCHITECTURE.md), [Prototype audit](docs/PROTOTYPE_AUDIT.md), [Roadmap](ROADMAP.md), [Engineering guide](docs/ENGINEERING_GUIDE.md), and [Contributing](CONTRIBUTING.md).
 
 ## Current repository
 - `index.html` — preserved exported browser prototype.
