@@ -160,7 +160,7 @@
 const $ = (id) => document.getElementById(id);
 const state = { projects: [], scenarios: [], runs: [], candidates: [], projectId: "", scenarioId: "", runId: "", candidateId: "" };
 let pendingLiveRunAttempt = null;
-let pendingCandidateSuiteAttempt = null;
+const pendingCandidateSuiteAttempts = new Map();
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -596,12 +596,14 @@ async function runCandidateSuite(candidateId) {
   const projectId = state.projectId;
   const scenarios = [...state.scenarios];
   const scope = projectId + ":" + candidateId;
-  if (!pendingCandidateSuiteAttempt || pendingCandidateSuiteAttempt.scope !== scope) {
-    pendingCandidateSuiteAttempt = {scope, keys:{}};
+  let attempt = pendingCandidateSuiteAttempts.get(scope);
+  if (!attempt) {
+    attempt = {keys:{}};
+    pendingCandidateSuiteAttempts.set(scope, attempt);
   }
   for (const scenario of scenarios) {
-    if (!pendingCandidateSuiteAttempt.keys[scenario.id]) {
-      pendingCandidateSuiteAttempt.keys[scenario.id] =
+    if (!attempt.keys[scenario.id]) {
+      attempt.keys[scenario.id] =
         (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function")
           ? globalThis.crypto.randomUUID()
           : (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + "-" + scenario.id);
@@ -627,7 +629,7 @@ async function runCandidateSuite(candidateId) {
         encodeURIComponent(candidateId),
         {
           method:"POST",
-          headers:{"Idempotency-Key":pendingCandidateSuiteAttempt.keys[scenario.id]}
+          headers:{"Idempotency-Key":attempt.keys[scenario.id]}
         }
       );
       results.push(run);
@@ -639,7 +641,7 @@ async function runCandidateSuite(candidateId) {
     $("candidate-target-run").selectedIndex = -1;
     $("candidate-regression-runs").selectedIndex = -1;
     await loadProjectData(results.length ? results[results.length - 1].id : undefined, candidateId);
-    pendingCandidateSuiteAttempt = null;
+    pendingCandidateSuiteAttempts.delete(scope);
     const passed = results.filter((run) => run.status === "passed").length;
     const failed = results.filter((run) => run.status === "failed").length;
     const inconclusive = results.filter((run) => run.status === "inconclusive").length;
