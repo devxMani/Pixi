@@ -17,10 +17,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.adapters.fake import FixtureAgentAdapter
+from app.adapters.http_json import build_configured_http_adapter
 from app.db import get_db
 from app.domain.evaluation import CheckResult, decide_evaluation
 from app.domain.scenario_runner import run_scenario
-from app.domain.scenarios import Scenario
+from app.domain.scenarios import Scenario, ScenarioResult
 from app.models import (
     CandidateEvaluationRecord,
     CandidateRecord,
@@ -151,6 +152,82 @@ def _serialize_run(db: Session, run: RunRecord) -> dict[str, object]:
             for item in checks
         ],
     }
+
+
+def _persist_scenario_result(
+    db: Session,
+    *,
+    project_id: str,
+    scenario_id: str,
+    scenario: Scenario,
+    result: ScenarioResult,
+    started_at: datetime,
+    finished_at: datetime,
+    idempotency_key: str | None = None,
+    fingerprint: str | None = None,
+) -> tuple[RunRecord, bool]:
+    """Persist evidence transactionally; return (run, is_idempotency_replay)."""
+    run = RunRecord(
+        id=str(uuid4()),
+        project_id=project_id,
+        scenario_id=scenario_id,
+        adapter_name=result.adapter_name,
+        evidence_mode=result.evidence_mode.value,
+        status=result.status.value,
+        scenario_snapshot=scenario.model_dump(mode="json"),
+        idempotency_key=idempotency_key,
+        idempotency_fingerprint=fingerprint,
+        started_at=started_at,
+        finished_at=finished_at,
+    )
+    try:
+        db.add(run)
+        db.flush()
+        db.add(
+            ObservationRecord(
+                id=str(uuid4()),
+                run_id=run.id,
+                transcript=result.observation.transcript,
+                latency_ms=result.observation.latency_ms,
+                tools_called=result.observation.tools_called,
+                error=result.observation.error,
+                evidence_mode=result.observation.evidence_mode.value,
+                provider=result.observation.provider,
+                model=result.observation.model,
+            )
+        )
+        for sequence, check in enumerate(result.checks):
+            db.add(
+                CheckRecord(
+                    id=str(uuid4()),
+                    run_id=run.id,
+                    sequence=sequence,
+                    assertion_id=check.name,
+                    passed=check.passed,
+                    error=check.error,
+                )
+            )
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if idempotency_key is not None:
+            existing = db.scalars(
+                select(RunRecord).where(
+                    RunRecord.project_id == project_id,
+                    RunRecord.scenario_id == scenario_id,
+                    RunRecord.idempotency_key == idempotency_key,
+                )
+            ).first()
+            if existing is not None and existing.idempotency_fingerprint == fingerprint:
+                return existing, True
+            if existing is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This Idempotency-Key was concurrently used with a different request payload.",
+                ) from exc
+        raise
+    db.refresh(run)
+    return run, False
 
 
 @app.get("/", include_in_schema=False)
@@ -328,66 +405,97 @@ async def create_demo_run(
     result = await run_scenario(adapter, scenario)
     finished_at = datetime.now(UTC)
 
-    run = RunRecord(
-        id=str(uuid4()),
+    run, replayed = _persist_scenario_result(
+        db,
         project_id=project_id,
         scenario_id=scenario_id,
-        adapter_name=result.adapter_name,
-        evidence_mode=result.evidence_mode.value,
-        status=result.status.value,
-        scenario_snapshot=scenario.model_dump(mode="json"),
-        idempotency_key=idempotency_key,
-        idempotency_fingerprint=fingerprint,
+        scenario=scenario,
+        result=result,
         started_at=started_at,
         finished_at=finished_at,
+        idempotency_key=idempotency_key,
+        fingerprint=fingerprint,
     )
+    if replayed:
+        response.status_code = 200
+    return _serialize_run(db, run)
+
+
+@router.post(
+    "/projects/{project_id}/scenarios/{scenario_id}/agent-runs",
+    status_code=201,
+)
+async def create_agent_run(
+    project_id: str,
+    scenario_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    response: Response,
+    idempotency_key: Annotated[
+        str | None, Header(alias="Idempotency-Key", min_length=1, max_length=200)
+    ] = None,
+) -> dict[str, object]:
+    """Execute one scenario against the configured external agent bridge."""
+    _project_or_404(db, project_id)
+    scenario_record = db.get(ScenarioRecord, scenario_id)
+    if scenario_record is None or scenario_record.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Scenario not found in this project.")
     try:
-        db.add(run)
-        db.flush()
-        observation = ObservationRecord(
-            id=str(uuid4()),
-            run_id=run.id,
-            transcript=result.observation.transcript,
-            latency_ms=result.observation.latency_ms,
-            tools_called=result.observation.tools_called,
-            error=result.observation.error,
-            evidence_mode=result.observation.evidence_mode.value,
-            provider=result.observation.provider,
-            model=result.observation.model,
+        adapter = build_configured_http_adapter()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Live agent bridge is not configured or its server-side configuration is invalid.",
+        ) from exc
+
+    scenario = Scenario.model_validate(scenario_record.definition)
+    fingerprint = None
+    if idempotency_key is not None:
+        idempotency_key = idempotency_key.strip()
+        if not idempotency_key:
+            raise HTTPException(status_code=422, detail="Idempotency-Key cannot be blank.")
+        canonical_payload = json.dumps(
+            {
+                "scenario_id": scenario_id,
+                "scenario": scenario.model_dump(mode="json"),
+                "endpoint": adapter.endpoint,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
         )
-        db.add(observation)
-        for sequence, check in enumerate(result.checks):
-            db.add(
-                CheckRecord(
-                    id=str(uuid4()),
-                    run_id=run.id,
-                    sequence=sequence,
-                    assertion_id=check.name,
-                    passed=check.passed,
-                    error=check.error,
-                )
+        fingerprint = hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+        existing = db.scalars(
+            select(RunRecord).where(
+                RunRecord.project_id == project_id,
+                RunRecord.scenario_id == scenario_id,
+                RunRecord.idempotency_key == idempotency_key,
             )
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        if idempotency_key is not None:
-            existing = db.scalars(
-                select(RunRecord).where(
-                    RunRecord.project_id == project_id,
-                    RunRecord.scenario_id == scenario_id,
-                    RunRecord.idempotency_key == idempotency_key,
-                )
-            ).first()
-            if existing is not None and existing.idempotency_fingerprint == fingerprint:
-                response.status_code = 200
-                return _serialize_run(db, existing)
-            if existing is not None:
+        ).first()
+        if existing is not None:
+            if existing.idempotency_fingerprint != fingerprint:
                 raise HTTPException(
                     status_code=409,
-                    detail="This Idempotency-Key was concurrently used with a different request payload.",
-                ) from exc
-        raise
-    db.refresh(run)
+                    detail="This Idempotency-Key was already used with a different request payload.",
+                )
+            response.status_code = 200
+            return _serialize_run(db, existing)
+
+    started_at = datetime.now(UTC)
+    result = await run_scenario(adapter, scenario)
+    finished_at = datetime.now(UTC)
+    run, replayed = _persist_scenario_result(
+        db,
+        project_id=project_id,
+        scenario_id=scenario_id,
+        scenario=scenario,
+        result=result,
+        started_at=started_at,
+        finished_at=finished_at,
+        idempotency_key=idempotency_key,
+        fingerprint=fingerprint,
+    )
+    if replayed:
+        response.status_code = 200
     return _serialize_run(db, run)
 
 

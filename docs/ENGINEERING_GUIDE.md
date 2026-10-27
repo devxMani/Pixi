@@ -23,5 +23,8 @@
 - Redact payloads before persistence where feasible.
 - Never treat a fixture or fake adapter as live evidence.
 
+## Agent integration boundary
+Read [the HTTP agent bridge contract](AGENT_BRIDGE.md) before configuring `PIXI_AGENT_ENDPOINT` or writing a provider adapter. The built-in bridge is a strict protocol boundary; it is not proof that a particular vendor has been integrated. Keep credentials server-side, disable redirects, cap timeouts, and treat transport/protocol failures as inconclusive.
+
 ## Proposed first implementation
 Add a minimal Python/FastAPI service with an isolated evaluation-policy module and tests before adding the database. The first module should make pass/fail/inconclusive rules independent of HTTP or provider SDKs. Then add PostgreSQL with migrations when the data model is defined. Do not build a UI rewrite until the core result contract is tested.
