@@ -1,4 +1,6 @@
 """Validated request schemas for the development API."""
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Any, Literal
 
@@ -248,6 +250,7 @@ class ProjectImportInput(BaseModel):
             if item.candidate_id is not None and item.candidate_id not in candidate_id_set:
                 raise ValueError("A run references a candidate absent from the backup.")
 
+        run_by_id = {item.id: item for item in self.runs}
         for candidate in self.candidates:
             if candidate.project_id != source_project_id:
                 raise ValueError("Every candidate must belong to the exported project.")
@@ -257,14 +260,38 @@ class ProjectImportInput(BaseModel):
                 if evaluation.candidate_id != candidate.id:
                     raise ValueError("Candidate evaluation references a different candidate.")
                 snapshot = evaluation.checks_snapshot
-                if snapshot.get("source") == "persisted_run_evidence":
-                    for section in ("baseline", "candidate_target"):
-                        run_id = (snapshot.get(section) or {}).get("run_id")
-                        if run_id not in run_id_set:
-                            raise ValueError("An evaluation snapshot references a run absent from the backup.")
-                    for regression in snapshot.get("regressions", []):
-                        if regression.get("run_id") not in run_id_set:
-                            raise ValueError("A regression snapshot references a run absent from the backup.")
+                if snapshot.get("source") != "persisted_run_evidence":
+                    continue
+
+                baseline = snapshot.get("baseline") or {}
+                target = snapshot.get("candidate_target") or {}
+                baseline_id = baseline.get("run_id")
+                target_id = target.get("run_id")
+                if baseline_id not in run_id_set or target_id not in run_id_set:
+                    raise ValueError("An evaluation snapshot references a run absent from the backup.")
+                baseline_run = run_by_id[baseline_id]
+                target_run = run_by_id[target_id]
+                if (
+                    baseline_run.variant not in (None, "baseline")
+                    or baseline_run.candidate_id is not None
+                    or target_run.variant != "candidate"
+                    or target_run.candidate_id != candidate.id
+                ):
+                    raise ValueError("Evaluation baseline/target provenance does not match the candidate.")
+                target_snapshot_candidate_id = target.get("candidate_id")
+                if target_snapshot_candidate_id is not None and target_snapshot_candidate_id != candidate.id:
+                    raise ValueError("Evaluation target snapshot references a different candidate.")
+                for regression in snapshot.get("regressions", []):
+                    regression_id = regression.get("run_id")
+                    if regression_id not in run_id_set:
+                        raise ValueError("A regression snapshot references a run absent from the backup.")
+                    regression_run = run_by_id[regression_id]
+                    if (
+                        regression_run.variant != "candidate"
+                        or regression_run.candidate_id != candidate.id
+                        or regression.get("scenario_id") != regression_run.scenario_id
+                    ):
+                        raise ValueError("Regression snapshot provenance does not match the candidate run.")
         return self
 
 
