@@ -540,7 +540,7 @@ const GATE=90,COND=["clean","noisy","interrupted","accented"],CN={clean:"clean",
 let SC=E.SCENARIOS.map(s=>JSON.parse(JSON.stringify(s)));
 let store;try{const sv2=JSON.parse(localStorage.getItem("px-lab-v2"));store=sv2&&sv2.versions?E.createStore(null,sv2):E.createStore(E.BASELINE)}catch(e){store=E.createStore(E.BASELINE)}
 const save=()=>{try{localStorage.setItem("px-lab-v2",JSON.stringify(store.export()))}catch(e){}if(typeof scheduleSync==="function")scheduleSync()};
-const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const tg=(c,t)=>`<span class="tag ${c||"idle"}">${t||c||"idle"}</span>`;
 let tab="ready",running=false,logs=[],intr=0,runs=[],B=null,progress="",ST=new Map(),deployed=null,mode="sim",budget=3,style="targeted";
