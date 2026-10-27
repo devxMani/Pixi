@@ -40,6 +40,7 @@
     <aside class="panel">
       <div class="panel-head"><div><h2>Workspace</h2><p class="subcopy">Choose the project you want to evaluate.</p></div><span class="number">01</span></div>
       <div class="field"><label for="project-select">Active project</label><select id="project-select"><option value="">Loading projects…</option></select></div>
+      <button class="btn secondary full" id="export-project" type="button" disabled>↓ Export project backup</button>
       <form id="project-form">
         <div class="field"><label for="project-name">Create a project</label><input id="project-name" maxlength="120" placeholder="e.g. Support voice agent" required></div>
         <button class="btn secondary full" type="submit">＋ Create project</button>
@@ -176,6 +177,7 @@ function renderProjects() {
   if (!state.projects.length) {
     select.append(node("option", "", "No project yet"));
     select.value = "";
+    $("export-project").disabled = true;
     return;
   }
   state.projects.forEach((project) => {
@@ -185,6 +187,7 @@ function renderProjects() {
   });
   if (!state.projects.some((p) => p.id === state.projectId)) state.projectId = state.projects[0].id;
   select.value = state.projectId;
+  $("export-project").disabled = !state.projectId;
 }
 function renderScenarios() {
   const list = $("scenario-list");
@@ -341,6 +344,38 @@ async function loadProjects(preferredId) {
   await loadProjectData();
   updateStats();
 }
+$("export-project").addEventListener("click", async () => {
+  clearNotice();
+  if (!state.projectId) { notice("Select a project before exporting.", true); return; }
+  const button = $("export-project");
+  button.disabled = true;
+  button.textContent = "Exporting project…";
+  try {
+    const response = await fetch(
+      "/api/v1/projects/" + encodeURIComponent(state.projectId) + "/export"
+    );
+    if (!response.ok) {
+      let payload = null;
+      try { payload = await response.json(); } catch (_) { payload = null; }
+      throw new Error((payload && payload.detail) || ("Export failed (HTTP " + response.status + ")."));
+    }
+    const snapshot = await response.blob();
+    const objectUrl = URL.createObjectURL(snapshot);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = "pixi-project-" + state.projectId + ".json";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    notice("Project backup downloaded. Keep it somewhere safe; backup import is not available yet.", false);
+  } catch (error) {
+    notice(error.message || "Could not export this project.", true);
+  } finally {
+    button.disabled = !state.projectId;
+    button.textContent = "↓ Export project backup";
+  }
+});
 $("project-select").addEventListener("change", async (event) => {
   state.projectId = event.target.value;
   state.scenarioId = "";
