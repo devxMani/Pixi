@@ -84,7 +84,9 @@
       <section class="panel">
         <div class="panel-head"><div><h2>Run against a configured agent</h2><p class="subcopy">Send the selected scenario to the server-side HTTP bridge.</p></div><span class="pill">LIVE BRIDGE</span></div>
         <p class="subcopy">This calls your configured agent endpoint, not the fixture simulator. Set <code>PIXI_AGENT_ENDPOINT</code> on the backend and follow <a href="https://github.com/devxMani/Pixi/blob/main/docs/AGENT_BRIDGE.md" target="_blank" rel="noreferrer">the bridge contract</a>. Provider setup is server-side; credentials are never entered here.</p>
-        <button class="btn full" id="live-run-button" type="button" disabled>↗ Run scenario against configured agent</button>
+        <button class="btn full" id="live-run-button" type="button" disabled>↗ Run baseline scenario</button>
+        <button class="btn secondary full" id="candidate-live-run-button" type="button" disabled>↗ Run selected candidate variant</button>
+        <p class="hint">Candidate variants must be executed by your bridge in an isolated staging environment. Pixi never applies a change to production.</p>
       </section>
     </div>
   </div>
@@ -96,7 +98,7 @@
     </div>
   </section>
   <section id="candidate-section" class="panel history">
-    <div class="panel-head"><div><h2>Candidate change lab</h2><p class="subcopy">Record a hypothesis, test the decision gate, and save human review.</p></div><span class="pill">SIMULATED GATE</span></div>
+    <div class="panel-head"><div><h2>Candidate change lab</h2><p class="subcopy">Record a hypothesis, test the decision gate, and save human review.</p></div><span class="pill">CANDIDATE GATE</span></div>
     <div class="history-grid">
       <div>
         <form id="candidate-form">
@@ -121,6 +123,17 @@
             <button class="btn full" type="submit">Evaluate candidate gate</button>
           </fieldset>
         </form>
+        <div class="rule"></div>
+        <form id="candidate-run-eval-form">
+          <fieldset id="candidate-run-eval-fields" disabled style="border:0;padding:0;margin:0;min-width:0">
+            <h3>Evaluate from saved live runs</h3>
+            <p class="subcopy">Select a failed baseline target, a passing candidate target, and at least one candidate-variant regression run. Candidate runs must share the same immutable agent version.</p>
+            <div class="field"><label for="candidate-baseline-run">Baseline target run</label><select id="candidate-baseline-run" required><option value="">No live baseline run available</option></select></div>
+            <div class="field"><label for="candidate-target-run">Candidate target run</label><select id="candidate-target-run" required><option value="">No candidate target run available</option></select></div>
+            <div class="field"><label for="candidate-regression-runs">Candidate regression runs (select one or more)</label><select id="candidate-regression-runs" multiple size="5" required><option value="">No candidate regression runs available</option></select><span class="hint">Use Ctrl/Command to select multiple saved regression runs.</span></div>
+            <button class="btn full" id="candidate-run-evaluate-button" type="submit" disabled>Evaluate saved live evidence</button>
+          </fieldset>
+        </form>
         <div id="candidate-detail" class="run-detail" style="margin-top:14px"><div class="empty">Select a candidate to inspect its saved evaluation.</div></div>
         <div class="field"><label for="candidate-reviewer">Reviewer</label><input id="candidate-reviewer" maxlength="120" value="Local reviewer"></div>
         <div class="field"><label for="candidate-review-note">Review note</label><textarea id="candidate-review-note" maxlength="2000" placeholder="Why accept or reject?"></textarea></div>
@@ -129,7 +142,7 @@
       </div>
     </div>
   </section>
-  <div class="footer">Pixi is an early-stage prototype. Authentication, project authorization, retention controls, and a real voice-agent adapter remain future work.</div>
+  <div class="footer">Pixi is an early-stage prototype. Authentication, project authorization, retention controls, and a verified provider-specific integration remain future work.</div>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
