@@ -20,7 +20,6 @@ from app.domain.scenarios import Scenario
 from app.models import CheckRecord, ObservationRecord, ProjectRecord, RunRecord, ScenarioRecord
 from app.schemas import EvaluateInput, FixtureObservationInput, ProjectCreate, ScenarioCreate
 
-
 app = FastAPI(
     title="Pixi API",
     version="0.3.0",
