@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
@@ -13,7 +14,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.adapters.fake import FixtureAgentAdapter
@@ -39,6 +40,7 @@ from app.schemas import (
     EvaluateInput,
     FixtureObservationInput,
     ProjectCreate,
+    ProjectImportInput,
     ScenarioCreate,
 )
 
@@ -996,6 +998,215 @@ def export_project(
             "Content-Disposition": f'attachment; filename="pixi-project-{project_id}.json"'
         },
     )
+
+
+def _remap_evaluation_snapshot(
+    source_snapshot: dict[str, object],
+    *,
+    run_id_map: dict[str, str],
+    scenario_id_map: dict[str, str],
+    candidate_id_map: dict[str, str],
+) -> dict[str, object]:
+    """Copy a saved evaluation snapshot and remap its internal evidence references."""
+    snapshot = deepcopy(source_snapshot)
+    if snapshot.get("source") != "persisted_run_evidence":
+        return snapshot
+
+    for section in ("baseline", "candidate_target"):
+        data = snapshot.get(section)
+        if not isinstance(data, dict):
+            continue
+        run_id = data.get("run_id")
+        if isinstance(run_id, str):
+            data["run_id"] = run_id_map[run_id]
+        if section == "candidate_target":
+            candidate_id = data.get("candidate_id")
+            if isinstance(candidate_id, str):
+                data["candidate_id"] = candidate_id_map[candidate_id]
+
+    regressions = snapshot.get("regressions", [])
+    if isinstance(regressions, list):
+        for regression in regressions:
+            if not isinstance(regression, dict):
+                continue
+            run_id = regression.get("run_id")
+            scenario_id = regression.get("scenario_id")
+            if isinstance(run_id, str):
+                regression["run_id"] = run_id_map[run_id]
+            if isinstance(scenario_id, str):
+                regression["scenario_id"] = scenario_id_map[scenario_id]
+    return snapshot
+
+
+@router.post("/projects/import", status_code=201)
+def import_project_backup(
+    payload: ProjectImportInput,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    """Restore a validated JSON backup as a new project without overwriting existing data."""
+    source_project_id = payload.project.id
+    restored_name = payload.name_override or f"{payload.project.name[:109]} (restored)"
+    restored_name = restored_name[:120]
+    project_id = str(uuid4())
+    scenario_id_map = {item.id: str(uuid4()) for item in payload.scenarios}
+    run_id_map = {item.id: str(uuid4()) for item in payload.runs}
+    candidate_id_map = {item.id: str(uuid4()) for item in payload.candidates}
+
+    project = ProjectRecord(id=project_id, name=restored_name)
+    try:
+        db.add(project)
+        db.flush()
+
+        scenario_records = []
+        for item in payload.scenarios:
+            definition = item.definition.model_dump(mode="json")
+            definition["id"] = scenario_id_map[item.id]
+            scenario_records.append(
+                ScenarioRecord(
+                    id=scenario_id_map[item.id],
+                    project_id=project_id,
+                    name=item.name,
+                    definition=definition,
+                    created_at=item.created_at,
+                )
+            )
+        db.add_all(scenario_records)
+        db.flush()
+
+        candidate_records = [
+            CandidateRecord(
+                id=candidate_id_map[item.id],
+                project_id=project_id,
+                scenario_id=scenario_id_map[item.scenario_id],
+                hypothesis=item.hypothesis,
+                proposed_change=item.proposed_change,
+                status=item.status,
+                production_applied=item.production_applied,
+                created_at=item.created_at,
+            )
+            for item in payload.candidates
+        ]
+        db.add_all(candidate_records)
+        db.flush()
+
+        run_records = []
+        for item in payload.runs:
+            scenario_snapshot = item.scenario_snapshot.model_dump(mode="json")
+            scenario_snapshot["id"] = scenario_id_map[item.scenario_id]
+            if item.variant is not None:
+                variant = item.variant
+            else:
+                # Older schema-v1 exports predate explicit variants and versions. Preserve
+                # live provenance, but lack of agent_version will keep these runs ineligible
+                # for the new versioned candidate gate.
+                variant = "baseline" if item.evidence_mode == "live" else "simulated"
+            run_records.append(
+                RunRecord(
+                    id=run_id_map[item.id],
+                    project_id=project_id,
+                    scenario_id=scenario_id_map[item.scenario_id],
+                    adapter_name=item.adapter_name,
+                    evidence_mode=item.evidence_mode,
+                    status=item.status,
+                    scenario_snapshot=scenario_snapshot,
+                    idempotency_key=None,
+                    idempotency_fingerprint=None,
+                    candidate_id=(
+                        candidate_id_map[item.candidate_id] if item.candidate_id is not None else None
+                    ),
+                    variant=variant,
+                    agent_version=item.agent_version,
+                    started_at=item.started_at,
+                    finished_at=item.finished_at,
+                )
+            )
+        db.add_all(run_records)
+        db.flush()
+
+        for item in payload.runs:
+            new_run_id = run_id_map[item.id]
+            db.add_all(
+                [
+                    ObservationRecord(
+                        id=str(uuid4()),
+                        run_id=new_run_id,
+                        transcript=observation.transcript,
+                        latency_ms=observation.latency_ms,
+                        tools_called=observation.tools_called,
+                        error=observation.error,
+                        evidence_mode=observation.evidence_mode,
+                        provider=observation.provider,
+                        model=observation.model,
+                        created_at=observation.created_at,
+                    )
+                    for observation in item.observations
+                ]
+            )
+            db.add_all(
+                [
+                    CheckRecord(
+                        id=str(uuid4()),
+                        run_id=new_run_id,
+                        sequence=check.sequence,
+                        assertion_id=check.assertion_id,
+                        passed=check.passed,
+                        error=check.error,
+                    )
+                    for check in item.checks
+                ]
+            )
+
+        for candidate in payload.candidates:
+            new_candidate_id = candidate_id_map[candidate.id]
+            db.add_all(
+                [
+                    CandidateEvaluationRecord(
+                        id=str(uuid4()),
+                        candidate_id=new_candidate_id,
+                        outcome=evaluation.outcome,
+                        reason=evaluation.reason,
+                        evidence_mode=evaluation.evidence_mode,
+                        target_passed=evaluation.target_passed,
+                        regression_count=evaluation.regression_count,
+                        failed_regressions=evaluation.failed_regressions,
+                        critical_regressions=evaluation.critical_regressions,
+                        checks_snapshot=_remap_evaluation_snapshot(
+                            evaluation.checks_snapshot,
+                            run_id_map=run_id_map,
+                            scenario_id_map=scenario_id_map,
+                            candidate_id_map=candidate_id_map,
+                        ),
+                        review_decision=evaluation.review_decision,
+                        reviewer=evaluation.reviewer,
+                        review_note=evaluation.review_note,
+                        reviewed_at=evaluation.reviewed_at,
+                        created_at=evaluation.created_at,
+                    )
+                    for evaluation in candidate.evaluations
+                ]
+            )
+
+        db.commit()
+        db.refresh(project)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=422,
+            detail="Backup passed validation but could not be restored into this database.",
+        ) from exc
+
+    return {
+        "id": project.id,
+        "name": project.name,
+        "restored_from": source_project_id,
+        "created_at": project.created_at,
+        "counts": {
+            "scenarios": len(payload.scenarios),
+            "runs": len(payload.runs),
+            "candidates": len(payload.candidates),
+            "evaluations": sum(len(item.evaluations) for item in payload.candidates),
+        },
+    }
 
 
 app.include_router(router)

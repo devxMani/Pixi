@@ -116,6 +116,53 @@ def test_project_export_includes_scenarios_runs_observations_and_candidate_histo
     assert snapshot["candidates"][0]["evaluations"][0]["outcome"] == "passed"
     assert snapshot["candidates"][0]["evaluations"][0]["evidence_mode"] == "simulated"
 
+    restored_response = client.post(
+        "/api/v1/projects/import",
+        json={**snapshot, "name_override": "Recovery copy"},
+    )
+    assert restored_response.status_code == 201, restored_response.text
+    restored = restored_response.json()
+    restored_project_id = restored["id"]
+    assert restored_project_id != project_id
+    assert restored["restored_from"] == project_id
+    assert restored["name"] == "Recovery copy"
+    assert restored["counts"] == {
+        "scenarios": 1,
+        "runs": 1,
+        "candidates": 1,
+        "evaluations": 1,
+    }
+
+    restored_scenarios = client.get(
+        f"/api/v1/projects/{restored_project_id}/scenarios"
+    ).json()
+    restored_runs = client.get(f"/api/v1/projects/{restored_project_id}/runs").json()
+    restored_candidates = client.get(
+        f"/api/v1/projects/{restored_project_id}/candidates"
+    ).json()
+    assert len(restored_scenarios) == len(restored_runs) == len(restored_candidates) == 1
+
+    restored_scenario_id = restored_scenarios[0]["id"]
+    restored_run = restored_runs[0]
+    restored_candidate = restored_candidates[0]
+    assert restored_scenario_id != scenario_id
+    assert restored_scenarios[0]["definition"]["id"] == restored_scenario_id
+    assert restored_scenario_id == restored_run["scenario_id"]
+    assert restored_run["id"] != run_response.json()["id"]
+    assert restored_run["scenario_snapshot"]["id"] == restored_scenario_id
+    assert restored_run["observations"][0]["transcript"] == (
+        "The basic plan costs $20 per month."
+    )
+    assert restored_candidate["id"] != candidate_id
+    assert restored_candidate["scenario_id"] == restored_scenario_id
+    assert restored_candidate["latest_evaluation"]["outcome"] == "passed"
+    assert restored_candidate["latest_evaluation"]["evidence_mode"] == "simulated"
+
+    # Restore creates a second project copy; it does not overwrite the source.
+    original_runs = client.get(f"/api/v1/projects/{project_id}/runs").json()
+    assert len(original_runs) == 1
+    assert original_runs[0]["id"] == run_response.json()["id"]
+
 
 def test_project_export_returns_404_for_unknown_project(client: TestClient) -> None:
     response = client.get("/api/v1/projects/project-that-does-not-exist/export")
@@ -147,3 +194,22 @@ def test_idempotency_key_replays_same_run_and_rejects_changed_payload(
     history = client.get(f"/api/v1/projects/{project_id}/runs")
     assert history.status_code == 200
     assert len(history.json()) == 1
+
+
+def test_project_import_rejects_cross_project_or_dangling_references(
+    client: TestClient,
+) -> None:
+    project_id, scenario_id = create_project_and_scenario(client)
+    run_response = client.post(
+        f"/api/v1/projects/{project_id}/scenarios/{scenario_id}/demo-runs",
+        json={"transcript": "The basic plan costs $20 per month.", "latency_ms": 500},
+    )
+    assert run_response.status_code == 201
+    snapshot = client.get(f"/api/v1/projects/{project_id}/export").json()
+    snapshot["runs"][0]["scenario_id"] = "scenario-not-in-backup"
+
+    response = client.post("/api/v1/projects/import", json=snapshot)
+    assert response.status_code == 422
+    assert "run references a scenario absent from the backup" in response.text
+    projects = client.get("/api/v1/projects").json()
+    assert len(projects) == 1

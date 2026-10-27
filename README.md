@@ -35,15 +35,16 @@ Tests: run `pytest` from `backend`. Lint: run `ruff check app tests` from `backe
 - Projects, scenarios, runs, observations, checks, candidate proposals, evaluations, and review decisions persist through SQLAlchemy/Alembic.
 - The workspace shows persisted run history and evidence provenance.
 - `GET /api/v1/projects/{project_id}/export` returns a versioned JSON snapshot of a project's scenarios, runs, observations, checks, candidates, evaluations, and review history.
+- `POST /api/v1/projects/import` validates that snapshot's reference graph and restores it as a separate project, remapping project/scenario/run/candidate IDs and all saved evidence references. It does not overwrite the source project or execute candidate changes.
 - Supplying an `Idempotency-Key` header on a demo-run request makes retries return the original run; reusing the same key for different input returns HTTP 409.
 - A fixture run is clearly marked simulated. Exported data does not convert simulated evidence into live evidence.
 - A configurable server-side HTTP JSON bridge can execute baseline and candidate-variant scenarios through `POST /api/v1/projects/{project_id}/scenarios/{scenario_id}/agent-runs` (`?candidate_id=...` selects a candidate variant). It follows the strict protocol in `docs/AGENT_BRIDGE.md`; it is not a vendor-specific integration.
 - Candidate gate evaluations can be based on persisted run IDs, immutable agent versions, a failed baseline target, a passing candidate target, and passing candidate regression runs. Critical regressions block approval; fixture evidence never satisfies the live gate.
-- The export is a backup artifact, not yet a restore/import mechanism.
+- Restore preserves historical evidence and review decisions but does not re-run agents or apply candidates. Older exports without immutable agent versions remain ineligible for the versioned live-candidate gate.
 
 ## Safety and limitations
 
-The API defaults to disabled unless `APP_ENV=development`. This is intentionally local-development-only because authentication and project authorization are not implemented yet. Never expose this development API publicly or use it for real customer transcripts/audio. Provider credentials must remain server-side. Data redaction, retention controls, rate limiting, agent version records, import/restore, and production deployment hardening remain future work.
+The API defaults to disabled unless `APP_ENV=development`. This is intentionally local-development-only because authentication and project authorization are not implemented yet. Never expose this development API publicly or use it for real customer transcripts/audio. Provider credentials must remain server-side. Data redaction, retention controls, rate limiting, provider-specific runtime integration, and production deployment hardening remain future work.
 
 ## Near-term build plan
 
