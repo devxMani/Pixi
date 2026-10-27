@@ -30,7 +30,9 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Persist candidate proposals, evaluation snapshots, and human-review decisions; simulated evidence cannot be approved for release.
 - [x] Add retry-safe run creation using idempotency keys.
 - [x] Add a versioned JSON export for project evidence and evaluation history.
-- [ ] Add agent-version records, export restore/import, and restart/backup recovery tests.
+- [x] Record agent variant/version provenance on saved runs and add versioned JSON backup export/import that remaps evidence references.
+- [x] Test restore of project, scenario, run, candidate, evaluation, and human-review history with new IDs.
+- [ ] Add process-restart and durable-database backup/restore tests.
 - [ ] Add authentication/project authorization before storing private data.
 
 ## Phase 3 — Agent adapter and scenarios
