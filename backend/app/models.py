@@ -69,9 +69,9 @@ class RunRecord(Base):
     scenario_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     idempotency_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    candidate_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("candidates.id", ondelete="SET NULL"), nullable=True
-    )
+    # Historical provenance ID; intentionally not a foreign key so candidate
+    # cleanup cannot rewrite old run records and SQLite can add the column in place.
+    candidate_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     variant: Mapped[str] = mapped_column(String(20), nullable=False, default="simulated")
     agent_version: Mapped[str | None] = mapped_column(String(200), nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
