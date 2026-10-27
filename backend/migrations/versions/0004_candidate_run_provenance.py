@@ -11,18 +11,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Nullable FK columns can be added in-place on SQLite when their default is NULL.
-    # Avoid batch table recreation: earlier run-table FKs are unnamed and cannot be
-    # recreated portably without retroactively rewriting the initial migrations.
-    op.add_column(
-        "runs",
-        sa.Column(
-            "candidate_id",
-            sa.String(length=36),
-            sa.ForeignKey("candidates.id", ondelete="SET NULL"),
-            nullable=True,
-        ),
-    )
+    # Keep candidate_id as immutable provenance rather than adding a new FK
+    # constraint to the historical runs table. SQLite cannot ALTER in a new FK,
+    # and batch-recreating runs fails on older unnamed constraints.
+    op.add_column("runs", sa.Column("candidate_id", sa.String(length=36), nullable=True))
     op.add_column(
         "runs",
         sa.Column(
