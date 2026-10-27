@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Generator
 import json
+from collections.abc import Generator
 
 import httpx
 import pytest
