@@ -351,3 +351,73 @@ def test_candidate_gate_requires_every_project_regression_scenario(
     assert response.status_code == 409
     assert "Regression suite is incomplete" in response.json()["detail"]
     assert "missing 1 scenario" in response.json()["detail"]
+
+
+def test_restore_remaps_versioned_candidate_evidence_and_review_history(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_id, target_id, regression_id, candidate_id = create_project_scenarios_and_candidate(client)
+    install_bridge(monkeypatch, target_scenario_id=target_id)
+
+    baseline = run_live(client, project_id, target_id, key="restore-baseline")
+    target = run_live(
+        client, project_id, target_id, candidate_id=candidate_id, key="restore-candidate-target"
+    )
+    regression = run_live(
+        client, project_id, regression_id, candidate_id=candidate_id, key="restore-candidate-regression"
+    )
+    evaluation = evaluate_runs(client, candidate_id, baseline, target, [regression])
+    assert evaluation.status_code == 201, evaluation.text
+    review = client.post(
+        f"/api/v1/candidates/{candidate_id}/review",
+        json={"decision": "accept", "reviewer": "Restore audit test"},
+    )
+    assert review.status_code == 200
+
+    exported = client.get(f"/api/v1/projects/{project_id}/export")
+    assert exported.status_code == 200
+    restored_response = client.post("/api/v1/projects/import", json=exported.json())
+    assert restored_response.status_code == 201, restored_response.text
+    restored_id = restored_response.json()["id"]
+
+    scenarios = client.get(f"/api/v1/projects/{restored_id}/scenarios").json()
+    scenario_ids_by_name = {item["name"]: item["id"] for item in scenarios}
+    assert scenario_ids_by_name["Answer pricing"] != target_id
+    assert scenario_ids_by_name["Protect secret handling"] != regression_id
+
+    runs = client.get(f"/api/v1/projects/{restored_id}/runs").json()
+    restored_target_id = scenario_ids_by_name["Answer pricing"]
+    restored_regression_id = scenario_ids_by_name["Protect secret handling"]
+    baseline_copy = next(
+        run for run in runs
+        if run["variant"] == "baseline" and run["scenario_id"] == restored_target_id
+    )
+    target_copy = next(
+        run for run in runs
+        if run["variant"] == "candidate" and run["scenario_id"] == restored_target_id
+    )
+    regression_copy = next(
+        run for run in runs
+        if run["variant"] == "candidate" and run["scenario_id"] == restored_regression_id
+    )
+    assert baseline_copy["id"] != baseline["id"]
+    assert target_copy["id"] != target["id"]
+    assert regression_copy["id"] != regression["id"]
+
+    candidates = client.get(f"/api/v1/projects/{restored_id}/candidates").json()
+    assert len(candidates) == 1
+    restored_candidate = candidates[0]
+    assert restored_candidate["id"] != candidate_id
+    assert restored_candidate["status"] == "accepted"
+    latest = restored_candidate["latest_evaluation"]
+    assert latest["review_decision"] == "accept"
+    assert latest["reviewer"] == "Restore audit test"
+    snapshot = latest["checks_snapshot"]
+    assert snapshot["source"] == "persisted_run_evidence"
+    assert snapshot["baseline"]["run_id"] == baseline_copy["id"]
+    assert snapshot["candidate_target"]["run_id"] == target_copy["id"]
+    assert snapshot["candidate_target"]["candidate_id"] == restored_candidate["id"]
+    assert snapshot["regressions"][0]["run_id"] == regression_copy["id"]
+    assert snapshot["regressions"][0]["scenario_id"] == restored_regression_id
+    assert target_copy["candidate_id"] == restored_candidate["id"]
+    assert regression_copy["candidate_id"] == restored_candidate["id"]
