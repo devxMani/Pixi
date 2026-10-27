@@ -215,6 +215,7 @@ function renderScenarios() {
     list.append(node("div", "empty", "Create a project to save your first scenario."));
     $("run-fields").disabled = true;
     $("live-run-button").disabled = true;
+    $("candidate-live-run-button").disabled = true;
     return;
   }
   if (!state.scenarios.length) {
@@ -235,6 +236,7 @@ function renderScenarios() {
   });
   $("run-fields").disabled = !state.scenarioId;
   $("live-run-button").disabled = !state.scenarioId;
+  $("candidate-live-run-button").disabled = !state.scenarioId || !state.candidateId;
 }
 function renderSelectedScenario() {
   const box = $("selected-scenario");
@@ -245,6 +247,7 @@ function renderSelectedScenario() {
     box.append(node("p", "", "Select an existing case or create one to enable a demo run."));
     $("run-fields").disabled = true;
     $("live-run-button").disabled = true;
+    $("candidate-live-run-button").disabled = true;
     return;
   }
   const def = selected.definition || {};
@@ -254,6 +257,7 @@ function renderSelectedScenario() {
   box.append(node("p", "", (def.assertions || []).length + " assertion(s) configured. Fixture runs below use the saved assertions."));
   $("run-fields").disabled = false;
   $("live-run-button").disabled = false;
+  $("candidate-live-run-button").disabled = !state.candidateId;
 }
 function renderRunDetail(run) {
   const box = $("run-detail");
@@ -278,6 +282,9 @@ function renderRunDetail(run) {
   }
   const observation = (run.observations || [])[0] || {};
   row("Evidence mode", run.evidence_mode);
+  row("Variant", run.variant || "simulated");
+  row("Candidate ID", run.candidate_id);
+  row("Agent version", run.agent_version);
   row("Adapter", run.adapter_name);
   row("Transcript", observation.transcript, true);
   row("Latency", observation.latency_ms === null || observation.latency_ms === undefined ? null : observation.latency_ms + " ms");
@@ -314,7 +321,7 @@ function renderRuns(preferredRunId) {
     button.type = "button";
     button.append(node("strong", "", scenarioName || "Scenario run"));
     const meta = node("span");
-    meta.textContent = run.status + " · " + run.evidence_mode + " · " + new Date(run.started_at).toLocaleString();
+    meta.textContent = run.status + " · " + run.evidence_mode + " · " + (run.variant || "simulated") + (run.agent_version ? " · " + run.agent_version : "") + " · " + new Date(run.started_at).toLocaleString();
     button.append(meta);
     button.addEventListener("click", () => {
       state.runId = run.id;
@@ -473,38 +480,53 @@ $("run-form").addEventListener("submit", async (event) => {
   } catch (error) { notice(error.message, true); }
   finally { submit.disabled = false; submit.textContent = "▶ Evaluate fixture and save evidence"; }
 });
-$("live-run-button").addEventListener("click", async () => {
+async function runConfiguredAgent(candidateId) {
   clearNotice();
   if (!state.projectId || !state.scenarioId) {
     notice("Create or select a scenario first.", true);
     return;
   }
-  const scope = state.projectId + ":" + state.scenarioId;
+  if (candidateId && !state.candidates.some((candidate) => candidate.id === candidateId)) {
+    notice("Select a candidate before running its variant.", true);
+    return;
+  }
+  const scope = state.projectId + ":" + state.scenarioId + ":" + (candidateId || "baseline");
   if (!pendingLiveRunAttempt || pendingLiveRunAttempt.scope !== scope) {
     const key = (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function")
       ? globalThis.crypto.randomUUID()
       : (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2));
     pendingLiveRunAttempt = {scope, key};
   }
-  const button = $("live-run-button");
+  const button = $(candidateId ? "candidate-live-run-button" : "live-run-button");
+  const defaultText = candidateId ? "↗ Run selected candidate variant" : "↗ Run baseline scenario";
   button.disabled = true;
   button.textContent = "Calling configured agent…";
+  let persistedRun = false;
   try {
+    const suffix = candidateId ? "?candidate_id=" + encodeURIComponent(candidateId) : "";
     const run = await api(
       "/api/v1/projects/" + encodeURIComponent(state.projectId) +
-      "/scenarios/" + encodeURIComponent(state.scenarioId) + "/agent-runs",
+      "/scenarios/" + encodeURIComponent(state.scenarioId) + "/agent-runs" + suffix,
       {method:"POST", headers:{"Idempotency-Key":pendingLiveRunAttempt.key}}
     );
+    persistedRun = true;
     pendingLiveRunAttempt = null;
-    await loadProjectData(run.id);
-    notice("Agent bridge run saved: " + run.status + " (" + run.evidence_mode + "). Inspect its evidence before using the result for a release decision.", run.status !== "passed");
+    await loadProjectData(run.id, candidateId || undefined);
+    notice(
+      "Agent bridge run saved: " + run.status + " (" + run.evidence_mode + ", " +
+      run.variant + ", version " + (run.agent_version || "missing") + "). Inspect the evidence before using it for a release decision.",
+      run.status !== "passed" || !run.agent_version
+    );
   } catch (error) {
-    notice(error.message + " Check server-side PIXI_AGENT_ENDPOINT and docs/AGENT_BRIDGE.md. Retry uses the same attempt key.", true);
+    notice(error.message + " Check server-side PIXI_AGENT_ENDPOINT and docs/AGENT_BRIDGE.md. Retry keeps the same attempt key when no response was received.", true);
   } finally {
-    button.disabled = !state.scenarioId;
-    button.textContent = "↗ Run scenario against configured agent";
+    button.disabled = !state.scenarioId || (Boolean(candidateId) && !state.candidateId);
+    button.textContent = defaultText;
   }
-});
+}
+$("live-run-button").addEventListener("click", () => runConfiguredAgent(null));
+$("candidate-live-run-button").addEventListener("click", () => runConfiguredAgent(state.candidateId));
+
 function renderCandidates() {
   const list = $("candidate-list");
   list.replaceChildren();
@@ -530,16 +552,97 @@ function renderCandidates() {
   $("candidate-eval-fields").disabled = !state.candidateId;
   renderCandidateDetail(state.candidates.find((candidate) => candidate.id === state.candidateId));
 }
+
+function formatRunOption(run) {
+  const name = (run.scenario_snapshot && run.scenario_snapshot.name) || run.scenario_id;
+  const version = run.agent_version || "version missing";
+  return name + " — " + run.status + " · " + run.variant + " · " + version + " · " + new Date(run.started_at).toLocaleString();
+}
+function fillRunSelect(selectId, runs, emptyText, multiple, preferredValues) {
+  const select = $(selectId);
+  const preferred = preferredValues || Array.from(select.selectedOptions || []).map((option) => option.value);
+  select.replaceChildren();
+  if (!runs.length) {
+    const empty = node("option", "", emptyText);
+    empty.value = "";
+    empty.disabled = true;
+    select.append(empty);
+    updateCandidateRunEvaluationButton();
+    return;
+  }
+  runs.forEach((run) => {
+    const option = node("option", "", formatRunOption(run));
+    option.value = run.id;
+    if (preferred.includes(run.id)) option.selected = true;
+    select.append(option);
+  });
+  if (!multiple && !select.value) select.options[0].selected = true;
+  if (multiple && preferred.length === 0) {
+    const seenScenarios = new Set();
+    Array.from(select.options).forEach((option) => {
+      const run = runs.find((item) => item.id === option.value);
+      if (run && !seenScenarios.has(run.scenario_id)) {
+        option.selected = true;
+        seenScenarios.add(run.scenario_id);
+      }
+    });
+  }
+  updateCandidateRunEvaluationButton();
+}
+function populateCandidateRunEvidenceOptions(candidate) {
+  const liveRuns = state.runs.filter((run) => run.evidence_mode === "live");
+  if (!candidate) {
+    fillRunSelect("candidate-baseline-run", [], "Select a candidate first", false, []);
+    fillRunSelect("candidate-target-run", [], "Select a candidate first", false, []);
+    fillRunSelect("candidate-regression-runs", [], "Select a candidate first", true, []);
+    updateCandidateRunEvaluationButton();
+    return;
+  }
+  const baselineRuns = liveRuns.filter((run) =>
+    run.variant === "baseline" &&
+    !run.candidate_id &&
+    run.scenario_id === candidate.scenario_id
+  );
+  const candidateRuns = liveRuns.filter((run) =>
+    run.variant === "candidate" && run.candidate_id === candidate.id
+  );
+  const targetRuns = candidateRuns.filter((run) => run.scenario_id === candidate.scenario_id);
+  const regressionRuns = candidateRuns.filter((run) => run.scenario_id !== candidate.scenario_id);
+  fillRunSelect("candidate-baseline-run", baselineRuns, "Run a live baseline for the target scenario", false);
+  fillRunSelect("candidate-target-run", targetRuns, "Run this candidate against the target scenario", false);
+  fillRunSelect("candidate-regression-runs", regressionRuns, "Run candidate variants against regression scenarios", true);
+}
+function updateCandidateRunEvaluationButton() {
+  const selectedRegressionIds = Array.from($("candidate-regression-runs").selectedOptions || [])
+    .map((option) => option.value)
+    .filter(Boolean);
+  const ready = Boolean(
+    state.candidateId &&
+    $("candidate-baseline-run").value &&
+    $("candidate-target-run").value &&
+    selectedRegressionIds.length > 0
+  );
+  $("candidate-run-evaluate-button").disabled = !ready;
+}
+$("candidate-baseline-run").addEventListener("change", updateCandidateRunEvaluationButton);
+$("candidate-target-run").addEventListener("change", updateCandidateRunEvaluationButton);
+$("candidate-regression-runs").addEventListener("change", updateCandidateRunEvaluationButton);
 function renderCandidateDetail(candidate) {
   const box = $("candidate-detail");
   box.replaceChildren();
   if (!candidate) {
     box.append(node("div", "empty", "Select a candidate to inspect its latest evaluation."));
     $("candidate-eval-fields").disabled = true;
+    $("candidate-run-eval-fields").disabled = true;
+    $("candidate-live-run-button").disabled = true;
     $("candidate-accept").disabled = true;
     $("candidate-reject").disabled = true;
+    populateCandidateRunEvidenceOptions(null);
     return;
   }
+  populateCandidateRunEvidenceOptions(candidate);
+  $("candidate-run-eval-fields").disabled = false;
+  $("candidate-live-run-button").disabled = !state.scenarioId;
   box.append(node("div", "detail-title", candidate.hypothesis));
   const statusRow = node("div", "detail-row");
   statusRow.append(node("strong", "", "Status"), statusTag(candidate.status));
@@ -549,7 +652,7 @@ function renderCandidateDetail(candidate) {
   box.append(change);
   const latest = candidate.latest_evaluation;
   if (!latest) {
-    box.append(node("div", "empty", "No evaluation saved. Submit fixture controls to test the gate."));
+    box.append(node("div", "empty", "No evaluation saved yet. Use recorded live runs to evaluate a candidate; the fixture controls below are only for policy testing."));
   } else {
     const head = node("div", "detail-head");
     head.append(node("div", "detail-title", "Latest evaluation"));
@@ -576,6 +679,8 @@ function renderCandidateDetail(candidate) {
   }
   const canApprove = Boolean(latest && latest.outcome === "passed" && latest.evidence_mode === "live");
   $("candidate-eval-fields").disabled = false;
+  $("candidate-run-eval-fields").disabled = false;
+  $("candidate-live-run-button").disabled = !state.scenarioId;
   $("candidate-accept").disabled = !canApprove;
   $("candidate-accept").title = canApprove ? "Records review only; does not deploy a change." : "A passing live-agent evaluation is required for approval.";
   $("candidate-reject").disabled = !latest;
@@ -603,6 +708,53 @@ $("candidate-form").addEventListener("submit", async (event) => {
     notice("Candidate recorded. Evaluation controls still use simulated evidence.", false);
   } catch (error) { notice(error.message, true); }
 });
+
+$("candidate-run-eval-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearNotice();
+  if (!state.candidateId) {
+    notice("Select a candidate first.", true);
+    return;
+  }
+  const baselineRunId = $("candidate-baseline-run").value;
+  const candidateTargetRunId = $("candidate-target-run").value;
+  const regressionRunIds = Array.from($("candidate-regression-runs").selectedOptions)
+    .map((option) => option.value)
+    .filter(Boolean);
+  if (!baselineRunId || !candidateTargetRunId || regressionRunIds.length === 0) {
+    notice("Select a baseline run, a candidate target run, and at least one candidate regression run.", true);
+    return;
+  }
+  const button = $("candidate-run-evaluate-button");
+  button.disabled = true;
+  button.textContent = "Evaluating saved evidence…";
+  try {
+    const candidate = await api(
+      "/api/v1/candidates/" + encodeURIComponent(state.candidateId) + "/evaluate-runs",
+      {
+        method:"POST",
+        body:{
+          baseline_run_id:baselineRunId,
+          candidate_target_run_id:candidateTargetRunId,
+          regression_run_ids:regressionRunIds
+        }
+      }
+    );
+    await loadProjectData(undefined, candidate.id);
+    const latest = candidate.latest_evaluation;
+    notice(
+      "Saved-run gate: " + latest.outcome + ". " + latest.reason +
+      (latest.review_decision ? " Review: " + latest.review_decision + "." : ""),
+      latest.outcome !== "passed"
+    );
+  } catch (error) {
+    notice(error.message, true);
+  } finally {
+    button.textContent = "Evaluate saved live evidence";
+    updateCandidateRunEvaluationButton();
+  }
+});
+
 $("candidate-eval-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   clearNotice();
