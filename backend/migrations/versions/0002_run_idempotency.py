@@ -4,8 +4,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0003_run_idempotency_merge"
-down_revision = ("0001_initial_schema", "0002_candidates")
+revision = "0003_run_idempotency"
+down_revision = "0002_candidates"
 branch_labels = None
 depends_on = None
 
