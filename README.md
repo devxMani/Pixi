@@ -4,7 +4,7 @@
 
 Pixi is an early-stage project exploring a closed-loop testing and reliability workflow for voice agents: scenario execution, evidence-backed failure analysis, small reversible candidate changes, and conservative regression-gated decisions.
 
-> Status: early prototype plus the first API-backed local workspace. The Miso UI is preserved at the root page. The Reliability Workspace supports projects, scenarios, simulated fixture runs, saved observations, assertion results, run history, candidate evaluations, human review, versioned JSON project exports, and a configurable HTTP bridge. Pixi provides a bridge contract, but no specific vendor/runtime is verified until an operator configures and validates its adapter.
+> Status: early-stage engineering workspace. The original Miso HTML is preserved as a reference baseline; the primary Reliability Workspace now lives in `web/` as a Next.js App Router + TypeScript application. It uses the existing FastAPI evaluation API through a guarded same-origin proxy. Pixi provides a generic bridge contract, but no specific vendor/runtime is verified until an operator configures and validates the adapter against its actual agent.
 
 ## Product direction
 
@@ -14,26 +14,51 @@ See Product specification at docs/PRODUCT_SPEC.md, Architecture at docs/ARCHITEC
 
 ## Run locally
 
-Requires Python 3.11+.
+Requires Python 3.11+ and Node.js 20.9+ (Node 22 recommended). The main UI and API run as two local processes.
 
-1. Change directory to `backend`.
-2. Create and activate a Python virtual environment.
-3. Install development dependencies with `pip install -e '.[dev]'`.
-4. Set `APP_ENV=development` in your local shell.
-5. Run `alembic upgrade head`.
-6. Run `uvicorn app.main:app --reload`.
-7. Open http://127.0.0.1:8000 for the original Miso prototype or http://127.0.0.1:8000/console.html for the API-backed Reliability Workspace.
+**Terminal 1 — FastAPI backend**
 
-The API docs are at http://127.0.0.1:8000/docs and the health endpoint is http://127.0.0.1:8000/health.
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+export APP_ENV=development
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
 
-Tests: run `pytest` from `backend`. Lint: run `ruff check app tests` from `backend`.
+**Terminal 2 — Next.js UI**
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Open http://localhost:3000 for the Next.js Reliability Workspace. The legacy prototype remains available at http://127.0.0.1:8000 and http://127.0.0.1:8000/console.html. API docs are at http://127.0.0.1:8000/docs and health is at http://127.0.0.1:8000/health.
+
+The web app uses a server-side same-origin proxy. Optionally set `PIXI_API_BASE_URL=http://127.0.0.1:8000/api/v1` in `web/.env.local` if your backend is not at the default address.
+
+**Quality checks**
+
+```bash
+# Python backend
+cd backend && pytest && ruff check app tests
+
+# Next.js frontend
+cd web && npm install && npm run typecheck && npm run lint && npm run build
+```
+
+GitHub Actions runs backend tests/migrations and a separate frontend typecheck/lint/build workflow on web changes.
 
 ## Current functionality
 
 - Evidence policy distinguishes passed, failed, inconclusive, invalid_setup, and not_applicable outcomes.
 - Scenario assertions cover response text, prohibited phrases, latency limits, and tool-call expectations.
 - Projects, scenarios, runs, observations, checks, candidate proposals, evaluations, and review decisions persist through SQLAlchemy/Alembic.
-- The workspace shows persisted run history and evidence provenance.
+- The primary workspace is a Next.js App Router + TypeScript app in `web/`, with strict API contracts, responsive evidence screens, and a same-origin server-side proxy to FastAPI.
+- The workspace shows persisted run history and evidence provenance. The earlier HTML console remains available as a reference/fallback.
 - `GET /api/v1/projects/{project_id}/export` returns a versioned JSON snapshot of a project's scenarios, runs, observations, checks, candidates, evaluations, and review history.
 - `POST /api/v1/projects/import` validates that snapshot's reference graph and restores it as a separate project, remapping project/scenario/run/candidate IDs and all saved evidence references. It does not overwrite the source project or execute candidate changes.
 - Supplying an `Idempotency-Key` header on a demo-run request makes retries return the original run; reusing the same key for different input returns HTTP 409.
@@ -45,7 +70,7 @@ Tests: run `pytest` from `backend`. Lint: run `ruff check app tests` from `backe
 
 ## Safety and limitations
 
-The API defaults to disabled unless `APP_ENV=development`. This is intentionally local-development-only because authentication and project authorization are not implemented yet. Never expose this development API publicly or use it for real customer transcripts/audio. Provider credentials must remain server-side. Data redaction, retention controls, rate limiting, provider-specific runtime integration, and production deployment hardening remain future work.
+The API and Next.js API proxy are deliberately disabled for production use until authentication and project authorization are implemented. Run locally with `APP_ENV=development`; never expose the development setup publicly or use it for real customer transcripts/audio. Provider credentials must remain server-side. Data redaction, retention controls, rate limiting, provider-specific runtime integration, and production deployment hardening remain future work.
 
 ## Near-term build plan
 
