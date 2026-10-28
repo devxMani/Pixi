@@ -59,9 +59,55 @@ For a baseline request:
   "model": "support-agent-model",
   "agent_version": "agent-config-or-build-immutable-id",
   "variant": "baseline",
-  "candidate_id": null
+  "candidate_id": null,
+  "voice_trace": {
+    "status": "completed",
+    "error": null,
+    "input_mode": "text",
+    "latency_basis": "text_input_to_completed_response",
+    "agent_version": "agent-config-or-build-immutable-id",
+    "candidate_id": null,
+    "measured_turn_count": 1,
+    "scenario_elapsed_ms": 625,
+    "turns": [
+      {
+        "user_input": "How much does the basic plan cost?",
+        "assistant_output": "The basic plan costs $20 per month.",
+        "tools": [
+          {
+            "name": "get_pricing",
+            "arguments": {"plan": "basic"},
+            "output": "$20 per month",
+            "latency_ms": 8.5,
+            "success": true,
+            "error": null
+          }
+        ],
+        "latency": {
+          "stt_processing_ms": null,
+          "eot_latency_ms": null,
+          "llm_ttft_ms": 140,
+          "tts_ttfb_ms": 90,
+          "e2e_ms": 325
+        },
+        "interruption": {
+          "interrupted": false,
+          "overlapping_speech": false,
+          "false_interruption": false,
+          "detection_delay_ms": null,
+          "agent_speech_duration_ms": null,
+          "recovered": false
+        },
+        "interrupted": false,
+        "status": "completed",
+        "error": null
+      }
+    ]
+  }
 }
 ```
+
+The `voice_trace` object is optional for generic protocol-v2 bridges. When supplied, it must be structured per-turn evidence with the same `agent_version` and `candidate_id` as the response envelope; `measured_turn_count` must equal the number of turns. Pixi validates and persists it, exposes it in run inspection, and includes it in JSON backups. Null STT/endpointing/interruption metrics mean the bridge did not measure them, not that the metrics were zero. For scripted-text LiveKit runs, use `input_mode=text` and `latency_basis=text_input_to_completed_response`; do not label these timings as microphone-to-audio latency.
 
 For a candidate request, `variant` must be `candidate`, `candidate_id` must exactly match the requested candidate record ID, and `agent_version` must identify the actual immutable candidate build/configuration. The same candidate version must be returned for its target and all regression scenarios in an experiment.
 
