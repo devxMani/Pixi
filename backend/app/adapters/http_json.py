@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
@@ -38,6 +38,7 @@ class BridgeResponse(BaseModel):
     agent_version: str = Field(min_length=1, max_length=200)
     variant: Literal["baseline", "candidate"]
     candidate_id: str | None
+    voice_trace: dict[str, Any] | None = None
 
 
 class HTTPJSONAgentAdapter:
@@ -166,6 +167,7 @@ class HTTPJSONAgentAdapter:
             agent_version=envelope.agent_version,
             variant=self.variant,
             candidate_id=self.candidate_id,
+            voice_trace=envelope.voice_trace,
         )
 
 
