@@ -222,7 +222,6 @@ export default function Workspace() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     getProjects()
       .then((data) => {
         if (!active) return;
@@ -243,15 +242,8 @@ export default function Workspace() {
   useEffect(() => {
     let active = true;
     if (!projectId) {
-      setScenarios([]);
-      setRuns([]);
-      setCandidates([]);
-      setSelectedScenarioId("");
-      setSelectedRunId("");
-      setSelectedCandidateId("");
       return () => { active = false; };
     }
-    setLoading(true);
     getProjectWorkspace(projectId)
       .then((data) => {
         if (!active) return;
@@ -300,6 +292,7 @@ export default function Workspace() {
     try {
       const created = await api<Project>("projects", { method: "POST", body: { name } });
       setProjects((current) => [created, ...current]);
+      setLoading(true);
       setProjectId(created.id);
       setProjectName("");
       setShowProjectModal(false);
@@ -583,6 +576,7 @@ export default function Workspace() {
     const file = event.target.files?.[0];
     if (!file) return;
     setBusy("import");
+    setLoading(true);
     setNotice(null);
     try {
       if (file.size > 20_000_000) throw new Error("Backup is larger than the local 20 MB import limit.");
@@ -644,7 +638,7 @@ export default function Workspace() {
         <header className="topbar">
           <div className="topbar-left">
             <div className="breadcrumb"><span>Pixi</span><span> / </span><strong>{page.title}</strong></div><ChevronDown size={13} color="var(--subtle)" />
-            <select aria-label="Active project" className="project-select" value={projectId} onChange={(event) => { setProjectId(event.target.value); setSelectedRunId(""); }} disabled={!projects.length}>
+            <select aria-label="Active project" className="project-select" value={projectId} onChange={(event) => { setLoading(true); setProjectId(event.target.value); setSelectedRunId(""); }} disabled={!projects.length}>
               {!projects.length ? <option value="">No projects yet</option> : null}
               {projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
