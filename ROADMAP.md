@@ -9,6 +9,8 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Create GitHub repository and version the baseline.
 - [x] Normalize branding and strengthen dynamic HTML escaping.
 - [x] Add prototype JavaScript syntax validation in CI.
+- [x] Preserve the HTML interfaces as reference baselines while creating the primary Next.js App Router + TypeScript workspace in `web/`.
+- [x] Add a same-origin guarded backend proxy and separate frontend CI for TypeScript, lint, and production build.
 - [ ] Complete a full security/dependency/API audit and inventory every prototype action.
 
 ## Phase 1 — Evaluation correctness
@@ -34,6 +36,7 @@ Milestones are complete only when code and reproducible evidence support them.
 - [x] Test restore of project, scenario, run, candidate, evaluation, and human-review history with new IDs.
 - [ ] Add process-restart and durable-database backup/restore tests.
 - [ ] Add authentication/project authorization before storing private data.
+- [ ] Add API-key/session authentication and explicit project ownership before enabling the proxy outside local development.
 
 ## Phase 3 — Agent adapter and scenarios
 
@@ -50,6 +53,8 @@ Milestones are complete only when code and reproducible evidence support them.
 ## Phase 4 — Product workflow
 
 - [x] Create a local API-backed UI for projects, scenarios, fixture runs, checks, and saved history.
+- [x] Migrate the primary Reliability Workspace from standalone HTML to Next.js App Router + TypeScript, preserving the original HTML as a reference/fallback.
+- [x] Add responsive scenario, run-evidence, candidate gate/review, export, and restore screens.
 - [x] Connect saved live-agent run history to the workspace, showing evidence mode, variant, and agent version.
 - [x] Make live-vs-simulated provenance visible in run history and evidence details.
 - [x] Implement candidate hypotheses/changes, gate evaluation snapshots, and human-review records; release approval remains locked for simulated evidence.
