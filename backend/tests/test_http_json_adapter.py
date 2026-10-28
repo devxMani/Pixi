@@ -41,6 +41,57 @@ def baseline_response(**overrides: object) -> dict[str, object]:
     return response
 
 
+def sample_voice_trace(
+    *,
+    agent_version: str = "agent-base-v1",
+    candidate_id: str | None = None,
+) -> dict[str, object]:
+    return {
+        "status": "completed",
+        "error": None,
+        "input_mode": "text",
+        "latency_basis": "text_input_to_completed_response",
+        "agent_version": agent_version,
+        "candidate_id": candidate_id,
+        "measured_turn_count": 1,
+        "scenario_elapsed_ms": 420.0,
+        "turns": [
+            {
+                "user_input": "How much is the basic plan?",
+                "assistant_output": "The basic plan costs $20 per month.",
+                "tools": [
+                    {
+                        "name": "get_pricing",
+                        "arguments": {"plan": "basic"},
+                        "output": "$20 per month",
+                        "latency_ms": 8.5,
+                        "success": True,
+                        "error": None,
+                    }
+                ],
+                "latency": {
+                    "stt_processing_ms": None,
+                    "eot_latency_ms": None,
+                    "llm_ttft_ms": 140.0,
+                    "tts_ttfb_ms": 90.0,
+                    "e2e_ms": 325.0,
+                },
+                "interruption": {
+                    "interrupted": False,
+                    "overlapping_speech": False,
+                    "false_interruption": False,
+                    "detection_delay_ms": None,
+                    "agent_speech_duration_ms": None,
+                    "recovered": False,
+                },
+                "interrupted": False,
+                "status": "completed",
+                "error": None,
+            }
+        ],
+    }
+
+
 @pytest.mark.asyncio
 async def test_http_bridge_sends_scenario_and_marks_valid_baseline_live() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -51,7 +102,7 @@ async def test_http_bridge_sends_scenario_and_marks_valid_baseline_live() -> Non
         assert payload["protocol_version"] == 2
         assert payload["experiment"] == {"variant": "baseline", "candidate": None}
         assert payload["scenario"]["id"] == "pricing"
-        return httpx.Response(200, json=baseline_response())
+        return httpx.Response(200, json=baseline_response(voice_trace=sample_voice_trace()))
 
     adapter = HTTPJSONAgentAdapter(
         endpoint="https://bridge.example.test/pixi/evaluate",
@@ -70,6 +121,10 @@ async def test_http_bridge_sends_scenario_and_marks_valid_baseline_live() -> Non
     assert result.transcript == "The basic plan costs $20 per month."
     assert result.latency_ms == 325
     assert result.tools_called == ["get_pricing"]
+    assert result.voice_trace is not None
+    assert result.voice_trace["input_mode"] == "text"
+    assert result.voice_trace["agent_version"] == result.agent_version
+    assert result.voice_trace["turns"][0]["tools"][0]["latency_ms"] == 8.5
 
 
 @pytest.mark.asyncio
