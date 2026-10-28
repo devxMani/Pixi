@@ -99,6 +99,50 @@ def test_agent_run_persists_live_evidence_and_replays_idempotently(
                 "agent_version": "agent-base-v1",
                 "variant": "baseline",
                 "candidate_id": None,
+                "voice_trace": {
+                    "status": "completed",
+                    "error": None,
+                    "input_mode": "text",
+                    "latency_basis": "text_input_to_completed_response",
+                    "agent_version": "agent-base-v1",
+                    "candidate_id": None,
+                    "measured_turn_count": 1,
+                    "scenario_elapsed_ms": 510.0,
+                    "turns": [
+                        {
+                            "user_input": "How much is the basic plan?",
+                            "assistant_output": "The basic plan costs $20 per month.",
+                            "tools": [
+                                {
+                                    "name": "get_pricing",
+                                    "arguments": {"plan": "basic"},
+                                    "output": "$20 per month",
+                                    "latency_ms": 8.5,
+                                    "success": True,
+                                    "error": None,
+                                }
+                            ],
+                            "latency": {
+                                "stt_processing_ms": None,
+                                "eot_latency_ms": None,
+                                "llm_ttft_ms": 140.0,
+                                "tts_ttfb_ms": 90.0,
+                                "e2e_ms": 325.0,
+                            },
+                            "interruption": {
+                                "interrupted": False,
+                                "overlapping_speech": False,
+                                "false_interruption": False,
+                                "detection_delay_ms": None,
+                                "agent_speech_duration_ms": None,
+                                "recovered": False,
+                            },
+                            "interrupted": False,
+                            "status": "completed",
+                            "error": None,
+                        }
+                    ],
+                },
             },
         )
 
@@ -131,6 +175,9 @@ def test_agent_run_persists_live_evidence_and_replays_idempotently(
     assert run["observations"][0]["evidence_mode"] == "live"
     assert run["observations"][0]["provider"] == "mocked-live-agent"
     assert run["observations"][0]["model"] == "voice-agent-v1"
+    assert run["observations"][0]["voice_trace"]["input_mode"] == "text"
+    assert run["observations"][0]["voice_trace"]["turns"][0]["tools"][0]["name"] == "get_pricing"
+    assert run["observations"][0]["voice_trace"]["turns"][0]["latency"]["llm_ttft_ms"] == 140.0
     assert run["checks"] and all(check["passed"] is True for check in run["checks"])
     assert replay.status_code == 200
     assert replay.json()["id"] == run["id"]
@@ -139,6 +186,20 @@ def test_agent_run_persists_live_evidence_and_replays_idempotently(
     history = client.get(f"/api/v1/projects/{project_id}/runs")
     assert history.status_code == 200
     assert len(history.json()) == 1
+
+    # Structured trace survives the user-initiated JSON backup and restore path.
+    backup_response = client.get(f"/api/v1/projects/{project_id}/export")
+    assert backup_response.status_code == 200
+    backup = backup_response.json()
+    assert backup["runs"][0]["observations"][0]["voice_trace"]["agent_version"] == "agent-base-v1"
+
+    restored = client.post("/api/v1/projects/import", json=backup)
+    assert restored.status_code == 201
+    restored_project_id = restored.json()["id"]
+    assert restored_project_id != project_id
+    restored_history = client.get(f"/api/v1/projects/{restored_project_id}/runs")
+    assert restored_history.status_code == 200
+    assert restored_history.json()[0]["observations"][0]["voice_trace"]["turns"][0]["tools"][0]["latency_ms"] == 8.5
 
 
 def test_agent_run_requires_server_side_endpoint_configuration(
