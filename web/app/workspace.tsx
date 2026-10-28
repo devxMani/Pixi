@@ -152,6 +152,103 @@ function RunDetail({ run }: { run: RunRecord }) {
           {observation && observation.tools_called.length ? " · Tools: " + observation.tools_called.join(", ") : ""}
         </p>
       </div>
+      {observation && observation.voice_trace ? (
+        <div className="evidence-block">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h3>Structured voice trace</h3>
+            <StatusPill value={observation.voice_trace.status} />
+          </div>
+          <p className="hint">
+            Input mode: {observation.voice_trace.input_mode || "not reported"}
+            {" · "}
+            Latency basis: {observation.voice_trace.latency_basis || "not reported"}
+            {" · "}
+            Turns: {observation.voice_trace.measured_turn_count ?? observation.voice_trace.turns.length}
+          </p>
+          {observation.voice_trace.input_mode === "text" ? (
+            <div className="notice info">
+              <AudioLines size={14} />
+              <span>
+                This run used scripted text input through the real LiveKit agent session.
+                Its response time is text-input-to-response timing, not microphone-to-audio
+                latency. STT, acoustic endpointing, VAD and barge-in metrics are only shown
+                when the runtime actually emits them.
+              </span>
+            </div>
+          ) : null}
+          {observation.voice_trace.error ? (
+            <p className="hint" style={{ color: "var(--red)" }}>Trace error: {observation.voice_trace.error}</p>
+          ) : null}
+          <div className="list">
+            {observation.voice_trace.turns.map((turn, index) => (
+              <div className="evidence-block" key={index}>
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <h3>Turn {index + 1}</h3>
+                  <StatusPill value={turn.status} />
+                </div>
+                <div className="field">
+                  <label>User input</label>
+                  <pre className="transcript">{turn.user_input || "Not recorded"}</pre>
+                </div>
+                <div className="field">
+                  <label>Assistant output</label>
+                  <pre className="transcript">{turn.assistant_output || "No assistant text recorded"}</pre>
+                </div>
+                {turn.error ? <p className="hint" style={{ color: "var(--red)" }}>Turn error: {turn.error}</p> : null}
+                <div className="detail-grid">
+                  {([
+                    ["STT processing", turn.latency.stt_processing_ms],
+                    ["End-of-utterance delay", turn.latency.eot_latency_ms],
+                    ["LLM time to first token", turn.latency.llm_ttft_ms],
+                    ["TTS time to first byte", turn.latency.tts_ttfb_ms],
+                    ["Turn response time", turn.latency.e2e_ms],
+                  ] as const).map(([label, value]) => (
+                    <div className="detail-cell" key={label}>
+                      <span>{label}</span>
+                      <strong>{value == null ? "Unavailable" : Math.round(value) + " ms"}</strong>
+                    </div>
+                  ))}
+                </div>
+                {turn.tools.length ? (
+                  <div className="evidence-block" style={{ marginTop: 12 }}>
+                    <h3>Tool events</h3>
+                    {turn.tools.map((tool, toolIndex) => (
+                      <div className="check-item" key={tool.name + "-" + toolIndex}>
+                        <div className={"check-mark " + (tool.success ? "pass" : "fail")}>
+                          {tool.success ? <Check size={11} /> : <X size={11} />}
+                        </div>
+                        <div className="check-copy">
+                          <strong>{tool.name} · {tool.latency_ms == null ? "latency unavailable" : Math.round(tool.latency_ms) + " ms"}</strong>
+                          <p>{tool.error || tool.output || (tool.success ? "Tool call completed" : "Tool call failed")}</p>
+                          {Object.keys(tool.arguments || {}).length ? (
+                            <pre className="transcript">{JSON.stringify(tool.arguments, null, 2)}</pre>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="hint">No tool events were recorded for this turn.</p>}
+                <div className="row" style={{ flexWrap: "wrap" }}>
+                  <StatusPill value={turn.interruption.interrupted ? "interrupted" : "not interrupted"} />
+                  <StatusPill value={turn.interruption.overlapping_speech ? "overlapping speech" : "no overlap reported"} />
+                  <StatusPill value={turn.interruption.recovered ? "recovered" : "recovery not reported"} />
+                </div>
+                {turn.interruption.detection_delay_ms != null || turn.interruption.agent_speech_duration_ms != null ? (
+                  <p className="hint">
+                    Interruption detection: {turn.interruption.detection_delay_ms == null ? "unavailable" : Math.round(turn.interruption.detection_delay_ms) + " ms"}
+                    {" · "}
+                    Agent speech duration: {turn.interruption.agent_speech_duration_ms == null ? "unavailable" : Math.round(turn.interruption.agent_speech_duration_ms) + " ms"}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ cursor: "pointer", color: "var(--muted)", fontSize: 11, fontWeight: 700 }}>Raw structured trace JSON</summary>
+            <pre className="transcript">{JSON.stringify(observation.voice_trace, null, 2)}</pre>
+          </details>
+        </div>
+      ) : null}
       <div className="evidence-block"><h3>Assertion evidence</h3><CheckList run={run} /></div>
     </div>
   );
