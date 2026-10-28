@@ -179,6 +179,42 @@ async def test_http_bridge_rejects_protocol_mismatch_as_an_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_http_bridge_rejects_voice_trace_with_mismatched_provenance() -> None:
+    adapter = HTTPJSONAgentAdapter(
+        endpoint="https://bridge.example.test/pixi/evaluate",
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                json=baseline_response(
+                    voice_trace=sample_voice_trace(agent_version="different-build-sha"),
+                ),
+            )
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="trace version did not match"):
+        await adapter.execute(sample_scenario())
+
+
+@pytest.mark.asyncio
+async def test_http_bridge_rejects_trace_turn_count_mismatch() -> None:
+    trace = sample_voice_trace()
+    trace["measured_turn_count"] = 2
+    adapter = HTTPJSONAgentAdapter(
+        endpoint="https://bridge.example.test/pixi/evaluate",
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                json=baseline_response(voice_trace=trace),
+            )
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="did not match protocol version 2"):
+        await adapter.execute(sample_scenario())
+
+
+@pytest.mark.asyncio
 async def test_http_bridge_rejects_extra_provenance_fields_from_remote_payload() -> None:
     adapter = HTTPJSONAgentAdapter(
         endpoint="https://bridge.example.test/evaluate",
