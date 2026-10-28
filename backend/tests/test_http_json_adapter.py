@@ -226,7 +226,7 @@ async def test_http_bridge_rejects_extra_provenance_fields_from_remote_payload()
         ),
     )
 
-    with pytest.raises(RuntimeError, match="did not match protocol version 2"):
+    with pytest.raises(RuntimeError, match="turn count did not match"):
         await adapter.execute(sample_scenario())
 
 
