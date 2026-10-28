@@ -30,3 +30,9 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# Next.js workspace
+web/.next/
+web/out/
+web/.eslintcache
+web/tsconfig.tsbuildinfo
