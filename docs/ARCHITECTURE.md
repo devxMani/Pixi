@@ -1,11 +1,24 @@
-# Pixi architecture (target)
+# Pixi architecture
 
-This is a target architecture, not a claim about current implementation.
+This document separates the current local implementation from the intended production architecture.
+
+## Current implementation
+
+- **Frontend:** `web/` is the primary Next.js App Router + TypeScript workspace. It calls the API through `web/app/api/pixi/[...path]/route.ts`, a same-origin server-side proxy. `index.html` and `console.html` remain legacy/reference implementations.
+- **Backend:** `backend/app/main.py` owns the FastAPI API, orchestration, persisted run evidence, evaluation gate, project export/import, and human review.
+- **Persistence:** SQLAlchemy models and Alembic migrations persist projects, scenarios, run snapshots, observations, checks, candidates, evaluations, and reviews.
+- **Agent boundary:** the HTTP JSON adapter is generic. It becomes a real integration only when configured against a trusted bridge that actually runs the chosen agent and returns observed output plus immutable version metadata.
+- **Deployment posture:** API routes return 503 unless `APP_ENV=development`; the Next.js proxy also refuses production-mode requests. This fail-closed posture is deliberate until authentication and project authorization exist. The app is not yet production deployable.
+
+## Intended high-level components
 
 ## High-level components
 
 ```text
-Browser UI
+Next.js App Router UI
+   |
+   v
+Same-origin server proxy (development only)
    |
    v
 FastAPI application ---- Authentication / project authorization
@@ -27,6 +40,14 @@ Run orchestrator ------------ PostgreSQL
 
 ## Initial deployment shape
 Start with a modular monolith: one frontend, one API service, one PostgreSQL database. Do not add queues, microservices, Kubernetes, or a dedicated worker until measured workload justifies them. Long-running live sessions may later be delegated to a worker/queue.
+
+## Frontend organization
+
+- `web/app/page.tsx` provides the entry page and `web/app/workspace.tsx` owns the current interactive workspace.
+- `web/lib/types.ts` mirrors the API's public data contracts; keep those types aligned when API schemas change.
+- `web/lib/api.ts` is the typed same-origin API client.
+- `web/app/api/pixi/[...path]/route.ts` forwards only same-origin GET/POST API requests to the configured FastAPI base URL. It rejects malformed path segments, refuses redirects, applies a local request-body cap, and is disabled when Next is running in production mode.
+- `web/app/globals.css` owns reusable responsive design tokens and components. Keep new UI components typed and accessible; do not expose provider credentials through client bundles.
 
 ## Core entities
 - **Project**: tenant boundary and settings.
