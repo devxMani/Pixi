@@ -23,6 +23,9 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+# Default local database is SQLite at backend/pixi.db; no DB server needed.
+# If you configured PostgreSQL/bridge variables in the root .env, load them:
+# set -a && source ../.env && set +a
 export APP_ENV=development
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
@@ -39,6 +42,8 @@ npm run dev
 Open http://localhost:3000 for the Next.js Reliability Workspace. The legacy prototype remains available at http://127.0.0.1:8000 and http://127.0.0.1:8000/console.html. API docs are at http://127.0.0.1:8000/docs and health is at http://127.0.0.1:8000/health.
 
 The web app uses a server-side same-origin proxy. Optionally set `PIXI_API_BASE_URL=http://127.0.0.1:8000/api/v1` in `web/.env.local` if your backend is not at the default address.
+
+The backend reads configuration from its process environment; it does **not** automatically load the root `.env`. For voice-agent integration, put `PIXI_AGENT_ENDPOINT`, `PIXI_AGENT_API_KEY`, and `PIXI_AGENT_TIMEOUT_SECONDS` in the ignored root `.env`, then load it from `backend/` using `set -a && source ../.env && set +a` before running migrations/the server. The example `DATABASE_URL` points to PostgreSQL, so a PostgreSQL server must be running when you choose to load that value; otherwise leave it unset and the local SQLite default is used. Keep `APP_ENV=development` for local-only access.
 
 **Quality checks**
 
