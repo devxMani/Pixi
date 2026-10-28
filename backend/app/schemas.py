@@ -130,6 +130,7 @@ class BackupObservation(BaseModel):
     evidence_mode: Literal["simulated", "live"]
     provider: str | None = Field(default=None, max_length=100)
     model: str | None = Field(default=None, max_length=100)
+    voice_trace: dict[str, Any] | None = None
     created_at: datetime
 
 

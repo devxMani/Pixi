@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -73,6 +74,7 @@ class AgentObservation(BaseModel):
     agent_version: str | None = None
     variant: RunVariant = RunVariant.SIMULATED
     candidate_id: str | None = None
+    voice_trace: dict[str, Any] | None = None
 
 
 class ScenarioStatus(StrEnum):

@@ -143,6 +143,7 @@ def _serialize_run(db: Session, run: RunRecord) -> dict[str, object]:
                 "evidence_mode": item.evidence_mode,
                 "provider": item.provider,
                 "model": item.model,
+                "voice_trace": item.voice_trace,
                 "created_at": item.created_at,
             }
             for item in observations
@@ -203,6 +204,7 @@ def _persist_scenario_result(
                 evidence_mode=result.observation.evidence_mode.value,
                 provider=result.observation.provider,
                 model=result.observation.model,
+                voice_trace=result.observation.voice_trace,
             )
         )
         for sequence, check in enumerate(result.checks):
@@ -1143,6 +1145,7 @@ def import_project_backup(
                         evidence_mode=observation.evidence_mode,
                         provider=observation.provider,
                         model=observation.model,
+                        voice_trace=observation.voice_trace,
                         created_at=observation.created_at,
                     )
                     for observation in item.observations

@@ -101,6 +101,7 @@ class ObservationRecord(Base):
     evidence_mode: Mapped[str] = mapped_column(String(20), nullable=False)
     provider: Mapped[str | None] = mapped_column(String(100), nullable=True)
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    voice_trace: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     run: Mapped[RunRecord] = relationship(back_populates="observations")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
@@ -23,6 +23,67 @@ class BridgeCandidate(BaseModel):
     proposed_change: str = Field(min_length=1, max_length=20_000)
 
 
+class BridgeVoiceTraceTool(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=100)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    output: str | None = Field(default=None, max_length=100_000)
+    latency_ms: float | None = Field(default=None, ge=0)
+    success: bool
+    error: str | None = Field(default=None, max_length=10_000)
+
+
+class BridgeVoiceTraceLatency(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stt_processing_ms: float | None = Field(default=None, ge=0)
+    eot_latency_ms: float | None = Field(default=None, ge=0)
+    llm_ttft_ms: float | None = Field(default=None, ge=0)
+    tts_ttfb_ms: float | None = Field(default=None, ge=0)
+    e2e_ms: float | None = Field(default=None, ge=0)
+
+
+class BridgeVoiceTraceInterruption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    interrupted: bool = False
+    overlapping_speech: bool = False
+    false_interruption: bool = False
+    detection_delay_ms: float | None = Field(default=None, ge=0)
+    agent_speech_duration_ms: float | None = Field(default=None, ge=0)
+    recovered: bool = False
+
+
+class BridgeVoiceTraceTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_input: str = Field(max_length=4_000)
+    assistant_output: str = Field(max_length=100_000)
+    tools: list[BridgeVoiceTraceTool] = Field(default_factory=list, max_length=100)
+    latency: BridgeVoiceTraceLatency
+    interruption: BridgeVoiceTraceInterruption
+    interrupted: bool = False
+    status: Literal["completed"]
+    error: str | None = Field(default=None, max_length=10_000)
+
+
+class BridgeVoiceTrace(BaseModel):
+    """Structured per-turn trace; extra top-level measurements stay forward-compatible."""
+
+    model_config = ConfigDict(extra="allow")
+
+    status: Literal["completed"]
+    error: str | None = Field(default=None, max_length=10_000)
+    input_mode: Literal["text", "audio"]
+    latency_basis: str = Field(min_length=1, max_length=100)
+    agent_version: str = Field(min_length=1, max_length=200)
+    candidate_id: str | None = Field(default=None, max_length=36)
+    measured_turn_count: int = Field(ge=1, le=12)
+    scenario_elapsed_ms: float = Field(ge=0)
+    turns: list[BridgeVoiceTraceTurn] = Field(min_length=1, max_length=12)
+
+
 class BridgeResponse(BaseModel):
     """Strict response envelope emitted by the voice-agent bridge endpoint."""
 
@@ -38,6 +99,7 @@ class BridgeResponse(BaseModel):
     agent_version: str = Field(min_length=1, max_length=200)
     variant: Literal["baseline", "candidate"]
     candidate_id: str | None
+    voice_trace: BridgeVoiceTrace | None = None
 
 
 class HTTPJSONAgentAdapter:
@@ -152,6 +214,13 @@ class HTTPJSONAgentAdapter:
             raise RuntimeError("Agent bridge response did not match the requested experiment variant.")
         if not envelope.agent_version.strip():
             raise RuntimeError("Agent bridge did not return an immutable agent_version.")
+        if envelope.voice_trace is not None:
+            if envelope.voice_trace.agent_version != envelope.agent_version:
+                raise RuntimeError("Agent bridge trace version did not match the response provenance.")
+            if envelope.voice_trace.candidate_id != envelope.candidate_id:
+                raise RuntimeError("Agent bridge trace candidate did not match the response provenance.")
+            if envelope.voice_trace.measured_turn_count != len(envelope.voice_trace.turns):
+                raise RuntimeError("Agent bridge trace turn count did not match its recorded turns.")
 
         # Provenance is set only after the bridge response is validated against the requested
         # variant and candidate. The remote payload does not set evidence_mode itself.
@@ -166,6 +235,7 @@ class HTTPJSONAgentAdapter:
             agent_version=envelope.agent_version,
             variant=self.variant,
             candidate_id=self.candidate_id,
+            voice_trace=(envelope.voice_trace.model_dump(mode="json") if envelope.voice_trace else None),
         )
 
 

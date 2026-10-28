@@ -45,6 +45,56 @@ export interface ScenarioRecord {
   created_at: string;
 }
 
+export interface VoiceTraceTool {
+  name: string;
+  arguments: Record<string, unknown>;
+  output: string | null;
+  latency_ms: number | null;
+  success: boolean;
+  error: string | null;
+}
+
+export interface VoiceTraceLatency {
+  stt_processing_ms: number | null;
+  eot_latency_ms: number | null;
+  llm_ttft_ms: number | null;
+  tts_ttfb_ms: number | null;
+  e2e_ms: number | null;
+}
+
+export interface VoiceTraceInterruption {
+  interrupted: boolean;
+  overlapping_speech: boolean;
+  false_interruption: boolean;
+  detection_delay_ms: number | null;
+  agent_speech_duration_ms: number | null;
+  recovered: boolean;
+}
+
+export interface VoiceTraceTurn {
+  user_input: string;
+  assistant_output: string;
+  tools: VoiceTraceTool[];
+  latency: VoiceTraceLatency;
+  interruption: VoiceTraceInterruption;
+  interrupted: boolean;
+  status: string;
+  error: string | null;
+}
+
+export interface VoiceTrace {
+  trace_started_at?: string;
+  input_mode?: "text" | "audio" | string;
+  latency_basis?: string;
+  agent_version?: string;
+  candidate_id?: string | null;
+  measured_turn_count?: number;
+  scenario_elapsed_ms?: number;
+  status: string;
+  error: string | null;
+  turns: VoiceTraceTurn[];
+}
+
 export interface Observation {
   id: string;
   transcript: string;
@@ -54,6 +104,7 @@ export interface Observation {
   evidence_mode: EvidenceMode;
   provider: string | null;
   model: string | null;
+  voice_trace?: VoiceTrace | null;
   created_at: string;
 }
 
